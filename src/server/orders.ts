@@ -81,7 +81,7 @@ export async function createOrder(input: CreateOrderInput) {
           },
         });
       });
-      publish(channels.outlet(outlet.id), { type: "order.created", orderId: order.id });
+      publish(channels.outlet(outlet.id), { type: "order.created", orderId: order.id, source: order.source });
       return order;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") continue;

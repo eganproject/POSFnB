@@ -2,7 +2,7 @@
 import { useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 
-export type RealtimeMessage = { type: string; orderId?: string; status?: string; tableName?: string; kind?: string };
+export type RealtimeMessage = { type: string; source?: string; orderId?: string; status?: string; tableName?: string; kind?: string };
 
 /**
  * Berlangganan SSE. Default: refresh data server component (debounce) saat ada event.

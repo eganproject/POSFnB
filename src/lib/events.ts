@@ -5,7 +5,7 @@ import { EventEmitter } from "node:events";
  * Cukup untuk satu instance server (development lokal / single node).
  */
 export type RealtimeEvent =
-  | { type: "order.created"; orderId: string }
+  | { type: "order.created"; orderId: string; source?: string }
   | { type: "order.updated"; orderId: string; status?: string }
   | { type: "payment.updated"; orderId: string }
   | { type: "request.created"; requestId: string; tableName: string; kind: string }

@@ -46,3 +46,15 @@ export function businessDate(date = new Date(), timeZone = process.env.APP_TIMEZ
 export function pad(n: number, len = 3) {
   return String(n).padStart(len, "0");
 }
+
+/** Geser tanggal YYYY-MM-DD sebanyak n hari */
+export function shiftDate(date: string, days: number) {
+  const d = new Date(`${date}T00:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
+export function percentChange(current: number, previous: number) {
+  if (!previous) return null;
+  return Math.round(((current - previous) / previous) * 100);
+}
