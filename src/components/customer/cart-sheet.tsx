@@ -77,9 +77,11 @@ export function CartSheet({
     if (!res.ok) {
       setSubmitting(false);
       toast.error(res.error);
+      // Muat ulang menu agar stok habis / perubahan harga terlihat
+      router.refresh();
       return;
     }
-    rememberOrder(outlet.id, res.data.orderId);
+    rememberOrder(outlet.id, res.data.orderId, res.data.queueNumber);
     cart.clear();
     router.push(`/order/${res.data.orderId}${pay === "ONLINE" ? "?pay=1" : ""}`);
   };

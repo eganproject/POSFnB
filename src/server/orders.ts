@@ -119,6 +119,9 @@ export async function setOrderStatus(
   if (!TRANSITIONS[order.status].includes(next)) {
     throw new OrderError("Status pesanan tidak bisa diubah ke tahap tersebut.");
   }
+  if (order.status === "PENDING" && next === "CONFIRMED" && opts.role === "DAPUR") {
+    throw new OrderError("Pesanan baru harus dikonfirmasi kasir / pelayan dulu.");
+  }
   if (next === "CANCELLED" && order.paymentStatus !== "UNPAID" && opts.role !== "OWNER") {
     throw new OrderError("Pesanan yang sudah dibayar hanya bisa dibatalkan oleh owner.");
   }
@@ -302,6 +305,32 @@ export async function applyGatewayState(
   });
   await recalcPayment(payment.orderId);
   return updated;
+}
+
+/**
+ * Batalkan otomatis pesanan QR "bayar online" yang tidak pernah dibayar
+ * agar papan pesanan tetap bersih.
+ */
+export async function expireStaleOrders(outletId: string, maxAgeMinutes = 120) {
+  const stale = await db.order.findMany({
+    where: {
+      outletId,
+      status: "PENDING",
+      paymentStatus: "UNPAID",
+      payPreference: "MIDTRANS",
+      createdAt: { lt: new Date(Date.now() - maxAgeMinutes * 60_000) },
+    },
+    select: { id: true },
+  });
+  for (const o of stale) {
+    await db.order.update({
+      where: { id: o.id },
+      data: { status: "CANCELLED", cancelReason: "Pembayaran online tidak diselesaikan" },
+    });
+    await db.payment.updateMany({ where: { orderId: o.id, state: "PENDING" }, data: { state: "EXPIRED" } });
+    notifyOrder(outletId, o.id, "CANCELLED");
+  }
+  return stale.length;
 }
 
 export { OrderError };

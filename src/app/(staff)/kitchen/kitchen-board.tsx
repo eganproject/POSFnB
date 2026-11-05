@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { OrderSource, OrderType, Role } from "@prisma/client";
@@ -45,6 +45,16 @@ export function KitchenBoard({ outletName, orders, role }: { outletName: string;
   const known = useRef<Set<string> | null>(null);
   const now = useNow();
   useRealtime("/api/stream/outlet");
+
+  // Rekap item yang belum selesai, berguna untuk masak sekaligus (batch)
+  const recap = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const o of orders) {
+      if (o.status === "READY") continue;
+      for (const i of o.items) if (!i.isDone) map.set(i.name, (map.get(i.name) ?? 0) + i.quantity);
+    }
+    return [...map.entries()].map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
+  }, [orders]);
 
   useEffect(() => {
     const ids = new Set(orders.filter((o) => o.status === "CONFIRMED").map((o) => o.id));
@@ -96,6 +106,16 @@ export function KitchenBoard({ outletName, orders, role }: { outletName: string;
           )}
         </div>
       </header>
+      {recap.length > 0 && (
+        <div className="no-scrollbar flex shrink-0 items-center gap-2 overflow-x-auto border-b px-4 py-2.5">
+          <span className="shrink-0 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Total dimasak</span>
+          {recap.map((r) => (
+            <span key={r.name} className="flex shrink-0 items-center gap-1.5 rounded-full bg-muted px-3 py-1 text-sm">
+              <b className="text-primary tabular">{r.qty}×</b> {r.name}
+            </span>
+          ))}
+        </div>
+      )}
       <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 overflow-x-auto p-4 md:grid-cols-3">
         {COLUMNS.map((col) => {
           const list = orders.filter((o) => o.status === col.key);

@@ -26,6 +26,26 @@ export default async function OrderPage({
   });
   if (!order) notFound();
   const paid = order.payments.filter((p) => p.state === "SUCCESS").reduce((s, p) => s + p.amount, 0);
+  // Posisi antrean & estimasi dari rata-rata waktu masak 7 hari terakhir
+  let ahead = 0;
+  let etaMinutes: number | null = null;
+  if (order.status === "CONFIRMED" || order.status === "PREPARING") {
+    const since = order.confirmedAt ?? order.createdAt;
+    const [count, recent] = await Promise.all([
+      db.order.count({ where: { outletId: order.outletId, status: { in: ["CONFIRMED", "PREPARING"] }, confirmedAt: { lt: since }, id: { not: order.id } } }),
+      db.order.findMany({
+        where: { outletId: order.outletId, readyAt: { not: null, gte: new Date(Date.now() - 7 * 864e5) }, confirmedAt: { not: null } },
+        select: { confirmedAt: true, readyAt: true },
+        orderBy: { readyAt: "desc" },
+        take: 40,
+      }),
+    ]);
+    ahead = count;
+    const durations = recent.map((r) => (r.readyAt!.getTime() - r.confirmedAt!.getTime()) / 60000).filter((m) => m > 0 && m < 90);
+    const avg = durations.length ? durations.reduce((a, b) => a + b, 0) / durations.length : 12;
+    const elapsed = (Date.now() - since.getTime()) / 60000;
+    etaMinutes = Math.max(2, Math.round(avg + ahead * avg * 0.35 - elapsed));
+  }
   const pending = order.payments.findLast((p) => p.method === "MIDTRANS" && p.state === "PENDING");
   return (
     <OrderTracker
@@ -58,6 +78,8 @@ export default async function OrderPage({
         outlet: order.outlet,
         table: order.table,
         pendingPaymentId: pending?.id ?? null,
+        ahead,
+        etaMinutes,
         items: order.items.map((i) => ({
           id: i.id,
           name: i.name,

@@ -5,6 +5,9 @@ import { channels, publish } from "@/lib/events";
 import { cartLineSchema, OrderError } from "@/server/pricing";
 import { applyGatewayState, createGatewayPayment, createOrder } from "@/server/orders";
 import { isMidtransEnabled } from "@/server/midtrans";
+import { rateLimit } from "@/lib/rate-limit";
+
+const TOO_MANY = "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.";
 
 export type ActionResult<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -27,8 +30,9 @@ const placeOrderSchema = z.object({
 
 export async function placeOrder(
   input: z.input<typeof placeOrderSchema>
-): Promise<ActionResult<{ orderId: string }>> {
+): Promise<ActionResult<{ orderId: string; queueNumber: number }>> {
   try {
+    if (!(await rateLimit("order", 8))) throw new OrderError(TOO_MANY);
     const data = placeOrderSchema.parse(input);
     let tableId: string | null = null;
     if (data.tableToken) {
@@ -57,7 +61,7 @@ export async function placeOrder(
         console.error("Gagal membuat transaksi Midtrans", e);
       }
     }
-    return { ok: true, data: { orderId: order.id } };
+    return { ok: true, data: { orderId: order.id, queueNumber: order.queueNumber } };
   } catch (e) {
     return fail(e);
   }
@@ -68,6 +72,7 @@ export async function startOnlinePayment(
   orderId: string
 ): Promise<ActionResult<{ paymentId: string; token: string; demo: boolean; redirectUrl: string | null }>> {
   try {
+    if (!(await rateLimit("pay", 12))) throw new OrderError(TOO_MANY);
     const order = await db.order.findUnique({ where: { id: orderId } });
     if (!order) throw new OrderError("Pesanan tidak ditemukan.");
     if (order.payPreference !== "MIDTRANS") {
@@ -121,6 +126,7 @@ export async function callStaff(
   note?: string
 ): Promise<ActionResult> {
   try {
+    if (!(await rateLimit("call", 6))) throw new OrderError(TOO_MANY);
     const table = await db.diningTable.findUnique({ where: { qrToken: tableToken } });
     if (!table) throw new OrderError("Meja tidak ditemukan.");
     const recent = await db.serviceRequest.findFirst({

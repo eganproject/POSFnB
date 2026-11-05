@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { expireStaleOrders } from "@/server/orders";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { getMenuForOutlet } from "@/server/menu";
 import { isMidtransEnabled } from "@/server/midtrans";
@@ -11,6 +12,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   const user = await requireUser(["OWNER", "KASIR", "PELAYAN"]);
   const outlet = await requireOutlet();
   const { order } = await searchParams;
+  await expireStaleOrders(outlet.id);
   const [categories, tables, openBills, shift, requests] = await Promise.all([
     getMenuForOutlet(outlet.id),
     db.diningTable.findMany({

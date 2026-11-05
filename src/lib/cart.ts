@@ -30,11 +30,16 @@ export function setLineQty(lines: CartLine[], key: string, qty: number) {
   return lines.map((l) => (l.key === key ? { ...l, quantity: Math.min(99, qty) } : l));
 }
 
+/**
+ * Rumus total yang sama dipakai di client (estimasi) dan server (sumber kebenaran):
+ * service dihitung dari (subtotal - diskon), pajak dihitung dari (subtotal - diskon + service).
+ */
 export function estimateTotals(subtotal: number, rates: { taxRate: number; serviceRate: number }, discount = 0) {
-  const base = Math.max(0, subtotal - discount);
+  const safeDiscount = Math.min(Math.max(0, Math.round(discount)), subtotal);
+  const base = subtotal - safeDiscount;
   const serviceCharge = Math.round((base * rates.serviceRate) / 100);
   const tax = Math.round(((base + serviceCharge) * rates.taxRate) / 100);
-  return { subtotal, discount: Math.min(discount, subtotal), serviceCharge, tax, total: base + serviceCharge + tax };
+  return { subtotal, discount: safeDiscount, serviceCharge, tax, total: base + serviceCharge + tax };
 }
 
 export function modifierText(mods: CartModifier[]) {

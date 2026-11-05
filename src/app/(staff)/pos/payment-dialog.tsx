@@ -1,7 +1,7 @@
 "use client";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { PaymentMethod } from "@prisma/client";
-import { Banknote, CheckCircle2, CreditCard, Landmark, Printer, QrCode, Smartphone, Users } from "lucide-react";
+import { Banknote, CheckCircle2, MessageCircle, CreditCard, Landmark, Printer, QrCode, Smartphone, Users } from "lucide-react";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
@@ -14,6 +14,7 @@ import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { useSnap } from "@/hooks/use-snap";
 import { getOrderForPayment, payOrder, startStaffOnlinePayment, type PaymentOrder } from "@/server/actions/staff";
 import { MoneyInput } from "./shift";
+import { quickCash, splitAmount } from "@/lib/payment-math";
 
 type Mode = "full" | "equal" | "items";
 type Method = Exclude<PaymentMethod, "MIDTRANS"> | "MIDTRANS";
@@ -26,12 +27,6 @@ const METHODS: { v: Method; label: string; icon: typeof Banknote; desc: string }
   { v: "TRANSFER", label: "Transfer", icon: Landmark, desc: "Rekening bank" },
 ];
 
-function quickCash(amount: number) {
-  const opts = new Set<number>([amount]);
-  for (const step of [5000, 10000, 20000, 50000, 100000]) opts.add(Math.ceil(amount / step) * step);
-  opts.add(Math.max(100000, Math.ceil(amount / 100000) * 100000));
-  return [...opts].sort((a, b) => a - b).slice(0, 5);
-}
 
 export function PaymentDialog({
   orderId,
@@ -97,18 +92,7 @@ export function PaymentDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pendingOnline]);
 
-  const amount = useMemo(() => {
-    if (!order) return 0;
-    if (mode === "full") return order.remaining;
-    if (mode === "equal") {
-      const left = Math.max(1, people - order.successCount);
-      return Math.min(order.remaining, Math.ceil(order.remaining / left / 100) * 100);
-    }
-    const itemsSubtotal = order.items.reduce((s, i) => s + (picked[i.id] ?? 0) * i.unitPrice, 0);
-    const allPicked = order.items.every((i) => (picked[i.id] ?? 0) === i.quantity - i.paidQty);
-    if (allPicked) return order.remaining;
-    return Math.min(order.remaining, Math.round((itemsSubtotal * order.total) / Math.max(1, order.subtotal)));
-  }, [order, mode, people, picked]);
+  const amount = useMemo(() => (order ? splitAmount(order, mode, people, picked) : 0), [order, mode, people, picked]);
 
   useEffect(() => setCash(amount), [amount]);
 
@@ -182,6 +166,7 @@ export function PaymentDialog({
                   <p className="text-3xl font-extrabold text-success tabular">{formatRupiah(done.change)}</p>
                 </div>
               )}
+              <WhatsAppShare order={order} />
               <div className="flex justify-center gap-2">
                 <Button variant="outline" size="lg" onClick={printReceipt}>
                   <Printer /> Cetak struk
@@ -343,5 +328,29 @@ export function PaymentDialog({
         }}
       />
     </>
+  );
+}
+
+/** Kirim link struk digital ke WhatsApp customer */
+function WhatsAppShare({ order }: { order: PaymentOrder }) {
+  const [phone, setPhone] = useState(order.customerPhone ?? "");
+  const send = () => {
+    let num = phone.replace(/\D/g, "");
+    if (num.startsWith("0")) num = `62${num.slice(1)}`;
+    if (num.length < 9) return toast.error("Nomor WhatsApp tidak valid");
+    const text = [
+      `Halo${order.customerName ? ` ${order.customerName}` : ""}, terima kasih sudah berkunjung 🙏`,
+      `Pesanan #${pad(order.queueNumber)} · Total ${formatRupiah(order.total)} (LUNAS)`,
+      `Struk digital: ${window.location.origin}/receipt/${order.id}`,
+    ].join("\n");
+    window.open(`https://wa.me/${num}?text=${encodeURIComponent(text)}`, "_blank");
+  };
+  return (
+    <div className="mx-auto flex max-w-sm gap-2">
+      <Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="No. WhatsApp customer" inputMode="tel" />
+      <Button variant="outline" onClick={send} className="shrink-0 text-success">
+        <MessageCircle /> Kirim struk
+      </Button>
+    </div>
   );
 }

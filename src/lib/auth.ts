@@ -36,6 +36,8 @@ export const auth = betterAuth({
       },
     },
   },
+  // Batasi percobaan login (brute force)
+  rateLimit: { enabled: true, window: 60, max: 60 },
   plugins: [nextCookies()],
 });
 

@@ -5,7 +5,7 @@ import type { OrderStatus } from "@prisma/client";
 import { db } from "@/lib/db";
 import { assertUser, canAccessOutlet, getActiveOutlet } from "@/lib/session";
 import { channels, publish } from "@/lib/events";
-import { OrderError, cartLineSchema } from "@/server/pricing";
+import { OrderError, cartLineSchema, computeTotals } from "@/server/pricing";
 import { addManualPayment, createGatewayPayment, createOrder, setOrderStatus } from "@/server/orders";
 import { isMidtransEnabled } from "@/server/midtrans";
 import { shiftSummary } from "@/server/reports";
@@ -224,6 +224,7 @@ export async function getOrderForPayment(orderId: string) {
     paymentStatus: o.paymentStatus,
     tableName: o.table?.name ?? null,
     customerName: o.customerName,
+    customerPhone: o.customerPhone,
     subtotal: o.subtotal,
     discount: o.discount,
     serviceCharge: o.serviceCharge,
@@ -244,3 +245,82 @@ export async function getOrderForPayment(orderId: string) {
   };
 }
 export type PaymentOrder = NonNullable<Awaited<ReturnType<typeof getOrderForPayment>>>;
+
+// ───────── Bayar gabungan per meja ─────────
+
+const tablePaySchema = z.object({
+  orderIds: z.array(z.string()).min(1).max(30),
+  method: z.enum(["CASH", "QRIS_STATIC", "CARD", "TRANSFER"]),
+  cashReceived: z.number().int().nullable().optional(),
+  reference: z.string().max(60).nullable().optional(),
+});
+
+export async function payOrdersTogether(input: z.input<typeof tablePaySchema>): Promise<Result<{ change: number; total: number }>> {
+  try {
+    const { user, outlet } = await ctx(["OWNER", "KASIR"]);
+    const data = tablePaySchema.parse(input);
+    const shift = await openShiftFor(user.id, outlet.id);
+    if (!shift) throw new OrderError("Buka shift kasir terlebih dahulu.");
+    const orders = await db.order.findMany({
+      where: { id: { in: data.orderIds }, outletId: outlet.id, status: { not: "CANCELLED" } },
+      include: { payments: { where: { state: "SUCCESS" } } },
+      orderBy: { createdAt: "asc" },
+    });
+    const due = orders
+      .map((o) => ({ id: o.id, remaining: o.total - o.payments.reduce((s, p) => s + p.amount, 0) }))
+      .filter((o) => o.remaining > 0);
+    if (!due.length) throw new OrderError("Semua tagihan sudah lunas.");
+    const total = due.reduce((s, o) => s + o.remaining, 0);
+    const cash = data.method === "CASH" ? data.cashReceived ?? total : null;
+    if (cash !== null && cash < total) throw new OrderError("Uang diterima kurang dari total tagihan.");
+    const change = cash !== null ? cash - total : 0;
+    for (const [i, o] of due.entries()) {
+      const last = i === due.length - 1;
+      await addManualPayment({
+        orderId: o.id,
+        method: data.method,
+        amount: o.remaining,
+        // Kembalian dicatat di pesanan terakhir agar rekap kas tetap akurat
+        cashReceived: cash !== null ? o.remaining + (last ? change : 0) : null,
+        reference: data.reference ?? null,
+        label: due.length > 1 ? "Gabungan meja" : null,
+        shiftId: shift.id,
+        userId: user.id,
+      });
+    }
+    revalidatePath("/pos");
+    return { ok: true, data: { change, total } };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ───────── Ubah item pesanan (sebelum dibayar) ─────────
+
+export async function adjustOrderItem(itemId: string, quantity: number): Promise<Result> {
+  try {
+    const { outlet } = await ctx(["OWNER", "KASIR"]);
+    const item = await db.orderItem.findUnique({ where: { id: itemId }, include: { order: { include: { items: true, outlet: true } } } });
+    const order = item?.order;
+    if (!item || !order || order.outletId !== outlet.id) throw new OrderError("Item tidak ditemukan.");
+    if (order.paymentStatus !== "UNPAID") throw new OrderError("Pesanan yang sudah dibayar (sebagian) tidak bisa diubah.");
+    if (["COMPLETED", "CANCELLED"].includes(order.status)) throw new OrderError("Pesanan sudah selesai / dibatalkan.");
+    if (!Number.isInteger(quantity) || quantity < 0 || quantity > item.quantity) throw new OrderError("Jumlah tidak valid.");
+    if (quantity === 0 && order.items.length === 1) throw new OrderError("Ini item terakhir. Batalkan pesanan jika tidak jadi.");
+    await db.$transaction(async (tx) => {
+      if (quantity === 0) await tx.orderItem.delete({ where: { id: itemId } });
+      else await tx.orderItem.update({ where: { id: itemId }, data: { quantity, lineTotal: item.unitPrice * quantity } });
+      const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
+      const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
+      await tx.order.update({ where: { id: order.id }, data: computeTotals(subtotal, order.outlet, order.discount) });
+      // Transaksi online lama nominalnya sudah tidak cocok
+      await tx.payment.updateMany({ where: { orderId: order.id, state: "PENDING" }, data: { state: "FAILED" } });
+    });
+    publish(channels.outlet(outlet.id), { type: "order.updated", orderId: order.id });
+    publish(channels.order(order.id), { type: "order.updated", orderId: order.id });
+    revalidatePath("/dashboard/orders");
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e);
+  }
+}

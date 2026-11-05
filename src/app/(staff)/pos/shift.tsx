@@ -15,7 +15,7 @@ export function ShiftChip({ shift }: { shift: { openedAt: string } | null }) {
     <Button asChild variant="outline" size="sm">
       <Link href="/dashboard/shifts">
         <span className={shift ? "size-2 rounded-full bg-success" : "size-2 rounded-full bg-destructive"} />
-        {shift ? `Shift sejak ${format(new Date(shift.openedAt), "HH:mm")}` : "Shift tertutup"}
+        <span className="hidden sm:inline">{shift ? `Shift sejak ${format(new Date(shift.openedAt), "HH:mm")}` : "Shift tertutup"}</span>
       </Link>
     </Button>
   );

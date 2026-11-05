@@ -36,20 +36,22 @@ export function useCart(storageKey: string) {
 }
 
 /** Riwayat pesanan customer di perangkat ini */
-export function rememberOrder(outletId: string, orderId: string) {
+export type RememberedOrder = { id: string; at: number; no?: number };
+
+export function rememberOrder(outletId: string, orderId: string, no?: number) {
   try {
     const key = `orders:${outletId}`;
-    const list: { id: string; at: number }[] = JSON.parse(localStorage.getItem(key) || "[]");
-    const next = [{ id: orderId, at: Date.now() }, ...list.filter((o) => o.id !== orderId)].slice(0, 10);
+    const list: RememberedOrder[] = JSON.parse(localStorage.getItem(key) || "[]");
+    const next = [{ id: orderId, at: Date.now(), no }, ...list.filter((o) => o.id !== orderId)].slice(0, 10);
     localStorage.setItem(key, JSON.stringify(next));
   } catch {
     /* ignore */
   }
 }
 
-export function recentOrders(outletId: string): { id: string; at: number }[] {
+export function recentOrders(outletId: string): RememberedOrder[] {
   try {
-    const list: { id: string; at: number }[] = JSON.parse(localStorage.getItem(`orders:${outletId}`) || "[]");
+    const list: RememberedOrder[] = JSON.parse(localStorage.getItem(`orders:${outletId}`) || "[]");
     return list.filter((o) => Date.now() - o.at < 1000 * 60 * 60 * 12);
   } catch {
     return [];

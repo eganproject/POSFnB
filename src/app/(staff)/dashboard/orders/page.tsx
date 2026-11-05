@@ -1,5 +1,6 @@
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
+import { expireStaleOrders } from "@/server/orders";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { businessDate } from "@/lib/utils";
 import { PageHeader } from "@/components/staff/page-header";
@@ -24,6 +25,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const tab = sp.tab && sp.tab in FILTERS ? sp.tab : "active";
   const date = sp.date || businessDate();
   const q = sp.q?.trim();
+  await expireStaleOrders(outlet.id);
 
   const base: Prisma.OrderWhereInput = {
     outletId: outlet.id,

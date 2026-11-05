@@ -40,6 +40,8 @@ type TrackerOrder = {
   outlet: { id: string; name: string; slug: string; taxRate: number; serviceRate: number };
   table: { name: string; qrToken: string } | null;
   pendingPaymentId: string | null;
+  ahead: number;
+  etaMinutes: number | null;
   items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; modifiers: string[] }[];
   payments: { id: string; method: PaymentMethod; amount: number; gatewayType: string | null }[];
 };
@@ -76,6 +78,13 @@ export function OrderTracker({
   const prevStatus = useRef(order.status);
 
   useRealtime(`/api/stream/order/${order.id}`);
+
+  // Perbarui estimasi waktu secara berkala selama pesanan diproses
+  useEffect(() => {
+    if (order.status !== "CONFIRMED" && order.status !== "PREPARING") return;
+    const t = setInterval(() => router.refresh(), 60_000);
+    return () => clearInterval(t);
+  }, [order.status, router]);
 
   // Notifikasi saat status berubah
   useEffect(() => {
@@ -175,6 +184,16 @@ export function OrderTracker({
             <h1 className="text-xl font-bold">{hero.title}</h1>
             <p className="text-sm text-white/85">{hero.desc}</p>
           </div>
+          {(order.status === "CONFIRMED" || order.status === "PREPARING") && order.etaMinutes !== null && (
+            <div className="relative mt-4 flex flex-wrap gap-2 text-xs font-semibold">
+              <span className="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur">⏱ Estimasi siap ± {order.etaMinutes} menit</span>
+              {order.status === "CONFIRMED" && (
+                <span className="rounded-full bg-white/20 px-3 py-1.5 backdrop-blur">
+                  {order.ahead > 0 ? `${order.ahead} pesanan di depanmu` : "Kamu antrean berikutnya"}
+                </span>
+              )}
+            </div>
+          )}
         </section>
 
         {/* Pembayaran */}

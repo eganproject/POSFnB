@@ -10,12 +10,12 @@ Dibangun dengan Next.js 15 (App Router) + TypeScript, Prisma + PostgreSQL, Bette
 
 | Area | Fitur |
 | --- | --- |
-| **Customer (HP)** | Menu digital per meja via QR, kategori & pencarian, varian/add-on, catatan per item, keranjang tersimpan, bayar online (QRIS, e-wallet, VA, kartu) atau bayar di kasir, pelacakan status live, panggil pelayan / minta bill, menu takeaway (`/m/[outlet]`) |
-| **Kasir (POS)** | Grid menu cepat, dine-in (pilih meja + status terisi) / takeaway, open bill, diskon, pembayaran tunai (uang pas & kembalian), QRIS/e-wallet via Midtrans, EDC/kartu/transfer, **split bill** (bagi rata atau per item), cetak struk thermal 80mm, buka/tutup shift dengan rekonsiliasi kas |
-| **Dapur (KDS)** | Layar gelap 3 kolom (antrean → dimasak → siap), timer & warna keterlambatan, centang per item, bunyi notifikasi pesanan baru, tandai stok habis |
+| **Customer (HP)** | Menu digital per meja via QR, kategori & pencarian, varian/add-on, catatan per item, keranjang tersimpan, bayar online (QRIS, e-wallet, VA, kartu) atau bayar di kasir, pelacakan status live dengan posisi antrean & estimasi waktu siap, daftar “Pesanan saya”, panggil pelayan / minta bill, menu takeaway (`/m/[outlet]`) |
+| **Kasir (POS)** | Grid menu cepat, dine-in (pilih meja + status terisi) / takeaway, open bill, diskon, pembayaran tunai (uang pas & kembalian), QRIS/e-wallet via Midtrans, EDC/kartu/transfer, **split bill** (bagi rata atau per item), **bayar sekaligus per meja**, kurangi/hapus item sebelum dibayar, cetak struk thermal 80mm, kirim struk via WhatsApp, buka/tutup shift dengan rekonsiliasi kas. Tampilan menyesuaikan tablet & HP |
+| **Dapur (KDS)** | Layar gelap 3 kolom (antrean → dimasak → siap), timer & warna keterlambatan, rekap total item yang harus dimasak, centang per item, bunyi notifikasi pesanan baru, tandai stok habis |
 | **Pelayan** | Konfirmasi pesanan QR “bayar di kasir”, notifikasi panggilan meja, tandai pesanan sudah diantar |
 | **Owner** | Dashboard ringkasan, papan pesanan, manajemen menu (kategori, foto upload, varian, add-on, favorit), meja & QR (cetak massal), multi-outlet (pajak, service, teks struk), pengguna & role, laporan (harian, terlaris, kategori, metode bayar, jam ramai) + ekspor CSV |
-| **Teknis** | Harga selalu dihitung ulang di server, realtime via SSE, webhook Midtrans terverifikasi signature + cek status otomatis (cocok untuk localhost), PWA (bisa di-install), mode demo pembayaran tanpa key |
+| **Teknis** | Harga selalu dihitung ulang di server, realtime via SSE, webhook Midtrans terverifikasi signature + cek status otomatis (cocok untuk localhost), PWA (bisa di-install), mode demo pembayaran tanpa key, pembatasan request publik & login, pesanan online yang tak dibayar dibatalkan otomatis setelah 2 jam, unit test |
 
 ### Role & akses
 
@@ -151,6 +151,7 @@ src/
 | `pnpm db:seed` | Isi ulang data contoh (menghapus data lama) |
 | `pnpm db:reset` | Reset database + migrasi + seed |
 | `pnpm db:studio` | Lihat isi database di browser (Prisma Studio) |
+| `pnpm test` | Unit test (perhitungan total, split bill, Midtrans) |
 | `pnpm typecheck` / `pnpm lint` | Pemeriksaan kode |
 
 ## 📝 Catatan

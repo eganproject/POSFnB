@@ -2,6 +2,7 @@ import "server-only";
 import { z } from "zod";
 import type { Outlet } from "@prisma/client";
 import { db } from "@/lib/db";
+import { estimateTotals } from "@/lib/cart";
 
 export const cartLineSchema = z.object({
   productId: z.string().min(1),
@@ -89,9 +90,5 @@ export function computeTotals(
   outlet: Pick<Outlet, "taxRate" | "serviceRate">,
   discount = 0
 ) {
-  const safeDiscount = Math.min(Math.max(0, Math.round(discount)), subtotal);
-  const base = subtotal - safeDiscount;
-  const serviceCharge = Math.round((base * outlet.serviceRate) / 100);
-  const tax = Math.round(((base + serviceCharge) * outlet.taxRate) / 100);
-  return { subtotal, discount: safeDiscount, serviceCharge, tax, total: base + serviceCharge + tax };
+  return estimateTotals(subtotal, outlet, discount);
 }

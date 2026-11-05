@@ -6,7 +6,8 @@ import { toast } from "sonner";
 import type { MenuCategory, MenuProduct } from "@/server/menu";
 import { cn, formatRupiah } from "@/lib/utils";
 import { lineKey } from "@/lib/cart";
-import { recentOrders, useCart } from "@/hooks/use-cart";
+import { recentOrders, useCart, type RememberedOrder } from "@/hooks/use-cart";
+import { useRouter } from "next/navigation";
 import { ProductImage } from "@/components/shared/product-image";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { ProductOptions } from "@/components/menu/product-options";
@@ -36,7 +37,9 @@ export function MenuApp({
   const [activeCat, setActiveCat] = useState(categories[0]?.id);
   const [selected, setSelected] = useState<{ product: MenuProduct; emoji: string | null } | null>(null);
   const [cartOpen, setCartOpen] = useState(false);
-  const [orders, setOrders] = useState<{ id: string }[]>([]);
+  const [orders, setOrders] = useState<RememberedOrder[]>([]);
+  const [ordersOpen, setOrdersOpen] = useState(false);
+  const router = useRouter();
   const [bump, setBump] = useState(0);
   const navRef = useRef<HTMLDivElement>(null);
 
@@ -128,12 +131,12 @@ export function MenuApp({
             )}
           </div>
           {orders.length > 0 && (
-            <Link
-              href={`/order/${orders[0].id}`}
+            <button
+              onClick={() => (orders.length === 1 ? router.push(`/order/${orders[0].id}`) : setOrdersOpen(true))}
               className="flex shrink-0 items-center gap-1.5 rounded-full bg-white/15 px-3 py-2 text-xs font-semibold backdrop-blur transition hover:bg-white/25"
             >
-              <Receipt className="size-4" /> Pesanan saya
-            </Link>
+              <Receipt className="size-4" /> Pesanan saya{orders.length > 1 ? ` (${orders.length})` : ""}
+            </button>
           )}
         </div>
       </header>
@@ -355,6 +358,33 @@ export function MenuApp({
               />
             </>
           )}
+        </DrawerContent>
+      </Drawer>
+
+      <Drawer open={ordersOpen} onOpenChange={setOrdersOpen}>
+        <DrawerContent>
+          <div className="space-y-3 px-5 pb-safe pt-3">
+            <DrawerTitle className="text-xl font-bold">Pesanan saya</DrawerTitle>
+            <DrawerDescription className="text-sm text-muted-foreground">Pesanan dari perangkat ini hari ini</DrawerDescription>
+            <ul className="space-y-2 pb-4">
+              {orders.map((o) => (
+                <li key={o.id}>
+                  <Link href={`/order/${o.id}`} className="flex items-center gap-3 rounded-2xl border p-3 transition hover:border-primary hover:bg-primary/5">
+                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 font-bold text-primary tabular">
+                      {o.no ? `#${String(o.no).padStart(3, "0")}` : <Receipt className="size-5" />}
+                    </span>
+                    <span className="flex-1 text-sm">
+                      <span className="block font-semibold">Pesanan {o.no ? `#${String(o.no).padStart(3, "0")}` : ""}</span>
+                      <span className="text-xs text-muted-foreground">
+                        Dibuat {new Date(o.at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </span>
+                    <ChevronRight className="size-4 text-muted-foreground" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          </div>
         </DrawerContent>
       </Drawer>
 

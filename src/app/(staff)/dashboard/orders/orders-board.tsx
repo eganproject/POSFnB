@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import type { OrderSource, OrderStatus, OrderType, PaymentMethod, PaymentState, PaymentStatus, Role } from "@prisma/client";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
-import { Bell, Check, ChefHat, CreditCard, HandPlatter, Printer, QrCode, Receipt, Search, ShoppingBag, X } from "lucide-react";
+import { Bell, Check, ChefHat, CreditCard, HandPlatter, Minus, Printer, QrCode, Receipt, Search, ShoppingBag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatRupiah, pad } from "@/lib/utils";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
@@ -15,7 +15,7 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, SheetContent } from "@/components/ui/dialog";
 import { OrderStatusBadge, PaymentStatusBadge } from "@/components/shared/status-badge";
-import { resolveRequest, updateOrderStatus } from "@/server/actions/staff";
+import { adjustOrderItem, resolveRequest, updateOrderStatus } from "@/server/actions/staff";
 
 export type BoardOrder = {
   id: string;
@@ -227,6 +227,16 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
   const next = NEXT[o.status];
   const remaining = o.total - o.paid;
   const canPay = role === "OWNER" || role === "KASIR";
+  const editable = canPay && o.paymentStatus === "UNPAID" && !["COMPLETED", "CANCELLED"].includes(o.status);
+  const adjust = (itemId: string, qty: number) =>
+    start(async () => {
+      const res = await adjustOrderItem(itemId, qty);
+      if (!res.ok) toast.error(res.error);
+      else {
+        toast.success("Pesanan diperbarui");
+        router.refresh();
+      }
+    });
 
   const run = (status: OrderStatus, why?: string) =>
     start(async () => {
@@ -275,10 +285,27 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
                 {i.modifiers.length > 0 && <p className="text-xs text-muted-foreground">{i.modifiers.join(", ")}</p>}
                 {i.note && <p className="text-xs italic text-primary">“{i.note}”</p>}
               </div>
-              <span className="tabular">{formatRupiah(i.lineTotal)}</span>
+              <div className="flex flex-col items-end gap-1">
+                <span className="tabular">{formatRupiah(i.lineTotal)}</span>
+                {editable && (
+                  <div className="flex gap-1">
+                    {i.quantity > 1 && (
+                      <button title="Kurangi 1" onClick={() => adjust(i.id, i.quantity - 1)} className="grid size-6 place-items-center rounded-md border text-muted-foreground hover:bg-muted">
+                        <Minus className="size-3" />
+                      </button>
+                    )}
+                    {o.items.length > 1 && (
+                      <button title="Hapus item" onClick={() => confirm(`Hapus ${i.name} dari pesanan?`) && adjust(i.id, 0)} className="grid size-6 place-items-center rounded-md border text-destructive hover:bg-destructive/10">
+                        <Trash2 className="size-3" />
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
             </li>
           ))}
         </ul>
+        {editable && <p className="text-xs text-muted-foreground">Item masih bisa dikurangi / dihapus selama pesanan belum dibayar.</p>}
         {o.note && <p className="rounded-xl bg-muted p-3 text-sm">📝 {o.note}</p>}
         <div className="space-y-1.5 rounded-xl bg-muted/60 p-4 text-sm">
           <Row l="Subtotal" v={o.subtotal} />
