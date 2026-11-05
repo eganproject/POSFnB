@@ -153,6 +153,8 @@ model Product {
   /// Harga dalam Rupiah (integer)
   price       Int
   imageUrl    String?
+  /// Emoji ilustrasi saat belum ada foto
+  emoji       String?
   isActive    Boolean  @default(true)
   isFeatured  Boolean  @default(false)
   sortOrder   Int      @default(0)

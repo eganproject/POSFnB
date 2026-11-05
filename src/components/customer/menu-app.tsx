@@ -43,7 +43,7 @@ export function MenuApp({
   useEffect(() => setOrders(recentOrders(outlet.id)), [outlet.id]);
 
   const featured = useMemo(
-    () => categories.flatMap((c) => c.products.filter((p) => p.isFeatured && !p.soldOut).map((p) => ({ p, emoji: c.icon }))),
+    () => categories.flatMap((c) => c.products.filter((p) => p.isFeatured && !p.soldOut).map((p) => ({ p, emoji: p.emoji }))),
     [categories]
   );
 
@@ -243,7 +243,7 @@ export function MenuApp({
                 return (
                   <button
                     key={p.id}
-                    onClick={() => openProduct(p, c.icon)}
+                    onClick={() => openProduct(p, p.emoji)}
                     disabled={p.soldOut}
                     className="flex w-full gap-3.5 p-3.5 text-left transition first:rounded-t-2xl last:rounded-b-2xl hover:bg-muted/40 disabled:cursor-not-allowed"
                   >
@@ -256,7 +256,7 @@ export function MenuApp({
                       <ProductImage
                         src={p.imageUrl}
                         name={p.name}
-                        emoji={c.icon}
+                        emoji={p.emoji}
                         className={cn("size-24 rounded-xl", p.soldOut && "grayscale")}
                       />
                       {p.soldOut ? (

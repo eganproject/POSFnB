@@ -71,7 +71,7 @@ export function PosApp(props: {
     const q = query.trim().toLowerCase();
     return categories
       .filter((c) => cat === "all" || c.id === cat)
-      .flatMap((c) => c.products.map((p) => ({ p, emoji: c.icon })))
+      .flatMap((c) => c.products.map((p) => ({ p, emoji: p.emoji })))
       .filter(({ p }) => !q || p.name.toLowerCase().includes(q));
   }, [categories, cat, query]);
 

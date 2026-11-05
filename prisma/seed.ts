@@ -8,7 +8,7 @@ const token = () => crypto.randomBytes(9).toString("base64url");
 
 type Opt = { name: string; price?: number; default?: boolean };
 type Group = { name: string; min: number; max: number; options: Opt[] };
-type Item = { name: string; price: number; desc: string; featured?: boolean; groups?: Group[] };
+type Item = { name: string; price: number; desc: string; emoji?: string; featured?: boolean; groups?: Group[] };
 
 const suhu: Group = { name: "Suhu", min: 1, max: 1, options: [{ name: "Dingin", default: true }, { name: "Panas" }] };
 const ukuran: Group = { name: "Ukuran", min: 1, max: 1, options: [{ name: "Regular", default: true }, { name: "Large", price: 6000 }] };
@@ -24,59 +24,59 @@ const MENU: { name: string; icon: string; items: Item[] }[] = [
     name: "Makanan Utama",
     icon: "🍛",
     items: [
-      { name: "Nasi Goreng Kampung", price: 32000, desc: "Nasi goreng bumbu terasi, ayam suwir, telur, acar dan kerupuk.", featured: true, groups: [pedas, lauk] },
-      { name: "Ayam Bakar Taliwang", price: 45000, desc: "Ayam kampung bakar bumbu taliwang khas Lombok, plecing kangkung.", featured: true, groups: [pedas, lauk] },
-      { name: "Nasi Ayam Geprek", price: 28000, desc: "Ayam crispy digeprek sambal bawang, lalapan dan nasi hangat.", groups: [pedas, lauk] },
-      { name: "Sop Buntut", price: 68000, desc: "Buntut sapi empuk dengan kuah bening rempah, wortel dan kentang.", groups: [lauk] },
-      { name: "Beef Rice Bowl", price: 42000, desc: "Irisan sapi teriyaki, onsen egg, dan salad wijen di atas nasi Jepang.", groups: [pedas] },
+      { name: "Nasi Goreng Kampung", emoji: "🍳", price: 32000, desc: "Nasi goreng bumbu terasi, ayam suwir, telur, acar dan kerupuk.", featured: true, groups: [pedas, lauk] },
+      { name: "Ayam Bakar Taliwang", emoji: "🍗", price: 45000, desc: "Ayam kampung bakar bumbu taliwang khas Lombok, plecing kangkung.", featured: true, groups: [pedas, lauk] },
+      { name: "Nasi Ayam Geprek", emoji: "🌶️", price: 28000, desc: "Ayam crispy digeprek sambal bawang, lalapan dan nasi hangat.", groups: [pedas, lauk] },
+      { name: "Sop Buntut", emoji: "🍲", price: 68000, desc: "Buntut sapi empuk dengan kuah bening rempah, wortel dan kentang.", groups: [lauk] },
+      { name: "Beef Rice Bowl", emoji: "🍚", price: 42000, desc: "Irisan sapi teriyaki, onsen egg, dan salad wijen di atas nasi Jepang.", groups: [pedas] },
     ],
   },
   {
     name: "Mie & Pasta",
     icon: "🍜",
     items: [
-      { name: "Mie Ayam Jamur", price: 27000, desc: "Mie kenyal dengan ayam jamur kecap, sawi, dan kuah kaldu.", groups: [mieTopping, pedas] },
-      { name: "Mie Goreng Jawa", price: 30000, desc: "Mie goreng arang dengan bumbu kemiri, ayam dan sayuran.", groups: [pedas, mieTopping] },
-      { name: "Spaghetti Aglio Olio", price: 38000, desc: "Bawang putih, cabai kering, peterseli dan udang.", groups: [pedas] },
+      { name: "Mie Ayam Jamur", emoji: "🍜", price: 27000, desc: "Mie kenyal dengan ayam jamur kecap, sawi, dan kuah kaldu.", groups: [mieTopping, pedas] },
+      { name: "Mie Goreng Jawa", emoji: "🍝", price: 30000, desc: "Mie goreng arang dengan bumbu kemiri, ayam dan sayuran.", groups: [pedas, mieTopping] },
+      { name: "Spaghetti Aglio Olio", emoji: "🍤", price: 38000, desc: "Bawang putih, cabai kering, peterseli dan udang.", groups: [pedas] },
     ],
   },
   {
     name: "Camilan",
     icon: "🍟",
     items: [
-      { name: "French Fries", price: 22000, desc: "Kentang goreng renyah dengan bumbu garlic parsley.", groups: [saus] },
-      { name: "Tahu Cabe Garam", price: 20000, desc: "Tahu sutra goreng tepung, tumis cabai dan bawang.", featured: true },
-      { name: "Pisang Goreng Keju", price: 23000, desc: "Pisang kepok goreng, keju parut dan susu kental manis." },
-      { name: "Dimsum Ayam (4 pcs)", price: 25000, desc: "Siomay ayam udang kukus dengan saus chili oil." },
+      { name: "French Fries", emoji: "🍟", price: 22000, desc: "Kentang goreng renyah dengan bumbu garlic parsley.", groups: [saus] },
+      { name: "Tahu Cabe Garam", emoji: "🧈", price: 20000, desc: "Tahu sutra goreng tepung, tumis cabai dan bawang.", featured: true },
+      { name: "Pisang Goreng Keju", emoji: "🍌", price: 23000, desc: "Pisang kepok goreng, keju parut dan susu kental manis." },
+      { name: "Dimsum Ayam (4 pcs)", emoji: "🥟", price: 25000, desc: "Siomay ayam udang kukus dengan saus chili oil." },
     ],
   },
   {
     name: "Kopi",
     icon: "☕",
     items: [
-      { name: "Es Kopi Susu Gula Aren", price: 24000, desc: "Espresso, susu segar, dan gula aren asli. Andalan kami!", featured: true, groups: [ukuran, gula, extraKopi] },
-      { name: "Americano", price: 22000, desc: "Double shot espresso dengan air.", groups: [suhu, ukuran, extraKopi] },
-      { name: "Caffè Latte", price: 28000, desc: "Espresso lembut dengan susu steamed.", groups: [suhu, ukuran, gula, extraKopi] },
-      { name: "Kopi Tubruk", price: 15000, desc: "Kopi robusta Temanggung diseduh tradisional.", groups: [gula] },
+      { name: "Es Kopi Susu Gula Aren", emoji: "🧋", price: 24000, desc: "Espresso, susu segar, dan gula aren asli. Andalan kami!", featured: true, groups: [ukuran, gula, extraKopi] },
+      { name: "Americano", emoji: "☕", price: 22000, desc: "Double shot espresso dengan air.", groups: [suhu, ukuran, extraKopi] },
+      { name: "Caffè Latte", emoji: "☕", price: 28000, desc: "Espresso lembut dengan susu steamed.", groups: [suhu, ukuran, gula, extraKopi] },
+      { name: "Kopi Tubruk", emoji: "🫖", price: 15000, desc: "Kopi robusta Temanggung diseduh tradisional.", groups: [gula] },
     ],
   },
   {
     name: "Non-Kopi",
     icon: "🧋",
     items: [
-      { name: "Matcha Latte", price: 30000, desc: "Matcha Jepang premium dengan susu segar.", groups: [suhu, ukuran, gula] },
-      { name: "Es Teh Leci", price: 20000, desc: "Teh melati dingin dengan buah leci.", groups: [ukuran, gula] },
-      { name: "Chocolate Signature", price: 28000, desc: "Cokelat Belgia pekat, creamy dan tidak terlalu manis.", groups: [suhu, ukuran] },
-      { name: "Air Mineral", price: 8000, desc: "Air mineral botol 600 ml." },
+      { name: "Matcha Latte", emoji: "🍵", price: 30000, desc: "Matcha Jepang premium dengan susu segar.", groups: [suhu, ukuran, gula] },
+      { name: "Es Teh Leci", emoji: "🥤", price: 20000, desc: "Teh melati dingin dengan buah leci.", groups: [ukuran, gula] },
+      { name: "Chocolate Signature", emoji: "🍫", price: 28000, desc: "Cokelat Belgia pekat, creamy dan tidak terlalu manis.", groups: [suhu, ukuran] },
+      { name: "Air Mineral", emoji: "💧", price: 8000, desc: "Air mineral botol 600 ml." },
     ],
   },
   {
     name: "Dessert",
     icon: "🍨",
     items: [
-      { name: "Es Campur Nusantara", price: 25000, desc: "Cincau, kolang-kaling, alpukat, nangka dan sirup merah.", featured: true },
-      { name: "Klepon Cake", price: 32000, desc: "Bolu pandan lembut dengan gula merah cair dan kelapa." },
-      { name: "Affogato", price: 30000, desc: "Es krim vanila disiram espresso panas." },
+      { name: "Es Campur Nusantara", emoji: "🍧", price: 25000, desc: "Cincau, kolang-kaling, alpukat, nangka dan sirup merah.", featured: true },
+      { name: "Klepon Cake", emoji: "🍰", price: 32000, desc: "Bolu pandan lembut dengan gula merah cair dan kelapa." },
+      { name: "Affogato", emoji: "🍨", price: 30000, desc: "Es krim vanila disiram espresso panas." },
     ],
   },
 ];
@@ -157,6 +157,7 @@ async function main() {
           categoryId: category.id,
           name: item.name,
           description: item.desc,
+          emoji: item.emoji,
           price: item.price,
           isFeatured: item.featured ?? false,
           sortOrder: pi,

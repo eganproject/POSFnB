@@ -35,6 +35,7 @@ export async function getMenuForOutlet(outletId: string) {
         description: p.description,
         price: p.price,
         imageUrl: p.imageUrl,
+        emoji: p.emoji ?? c.icon,
         isFeatured: p.isFeatured,
         soldOut: soldOut.has(p.id),
         groups: p.modifierGroups.map((g) => ({
