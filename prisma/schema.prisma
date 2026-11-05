@@ -1,0 +1,376 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────────────────────────
+// Auth (Better Auth)
+// ─────────────────────────────────────────────
+
+enum Role {
+  OWNER
+  KASIR
+  DAPUR
+  PELAYAN
+}
+
+model User {
+  id            String    @id
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  role          Role      @default(KASIR)
+  isActive      Boolean   @default(true)
+  outletId      String?
+  outlet        Outlet?   @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  sessions      Session[]
+  accounts      Account[]
+  shifts        Shift[]
+  orders        Order[]   @relation("OrderCashier")
+  payments      Payment[]
+
+  @@map("user")
+}
+
+model Session {
+  id        String   @id
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  @@map("account")
+}
+
+model Verification {
+  id         String   @id
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@map("verification")
+}
+
+// ─────────────────────────────────────────────
+// Outlet & meja
+// ─────────────────────────────────────────────
+
+model Outlet {
+  id            String   @id @default(cuid())
+  name          String
+  slug          String   @unique
+  address       String?
+  phone         String?
+  /// Persen pajak (PB1), mis. 10 = 10%
+  taxRate       Float    @default(10)
+  /// Persen service charge
+  serviceRate   Float    @default(0)
+  receiptFooter String?
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  tables      DiningTable[]
+  users       User[]
+  orders      Order[]
+  shifts      Shift[]
+  unavailable ProductUnavailable[]
+  requests    ServiceRequest[]
+}
+
+model DiningTable {
+  id        String   @id @default(cuid())
+  outletId  String
+  outlet    Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  name      String
+  area      String?
+  capacity  Int      @default(4)
+  qrToken   String   @unique
+  isActive  Boolean  @default(true)
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders   Order[]
+  requests ServiceRequest[]
+
+  @@unique([outletId, name])
+}
+
+// ─────────────────────────────────────────────
+// Menu
+// ─────────────────────────────────────────────
+
+model Category {
+  id        String    @id @default(cuid())
+  name      String
+  icon      String?
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  products  Product[]
+}
+
+model Product {
+  id          String   @id @default(cuid())
+  categoryId  String
+  category    Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
+  name        String
+  description String?
+  /// Harga dalam Rupiah (integer)
+  price       Int
+  imageUrl    String?
+  isActive    Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  modifierGroups ModifierGroup[]
+  unavailable    ProductUnavailable[]
+  orderItems     OrderItem[]
+}
+
+/// Varian (wajib pilih 1) maupun add-on (boleh pilih beberapa)
+model ModifierGroup {
+  id        String           @id @default(cuid())
+  productId String
+  product   Product          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name      String
+  minSelect Int              @default(0)
+  maxSelect Int              @default(1)
+  sortOrder Int              @default(0)
+  options   ModifierOption[]
+}
+
+model ModifierOption {
+  id          String        @id @default(cuid())
+  groupId     String
+  group       ModifierGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  name        String
+  priceDelta  Int           @default(0)
+  isDefault   Boolean       @default(false)
+  isAvailable Boolean       @default(true)
+  sortOrder   Int           @default(0)
+}
+
+/// Stok habis per outlet
+model ProductUnavailable {
+  outletId  String
+  outlet    Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@id([outletId, productId])
+}
+
+// ─────────────────────────────────────────────
+// Pesanan & pembayaran
+// ─────────────────────────────────────────────
+
+enum OrderType {
+  DINE_IN
+  TAKEAWAY
+}
+
+enum OrderSource {
+  QR
+  POS
+}
+
+enum OrderStatus {
+  /// Menunggu pembayaran online / konfirmasi staf
+  PENDING
+  /// Diterima, antre di dapur
+  CONFIRMED
+  PREPARING
+  READY
+  /// Sudah diantar / diambil
+  COMPLETED
+  CANCELLED
+}
+
+enum PaymentStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  REFUNDED
+}
+
+enum PaymentMethod {
+  CASH
+  MIDTRANS
+  QRIS_STATIC
+  CARD
+  TRANSFER
+}
+
+enum PaymentState {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+model Order {
+  id            String         @id @default(cuid())
+  code          String         @unique
+  /// Nomor antrean harian per outlet
+  queueNumber   Int
+  businessDate  String
+  outletId      String
+  outlet        Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  tableId       String?
+  table         DiningTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  type          OrderType      @default(DINE_IN)
+  source        OrderSource
+  status        OrderStatus    @default(PENDING)
+  paymentStatus PaymentStatus  @default(UNPAID)
+  /// Pilihan bayar customer QR: MIDTRANS = bayar online, null = bayar di kasir
+  payPreference PaymentMethod?
+  customerName  String?
+  customerPhone String?
+  note          String?
+  subtotal      Int
+  discount      Int            @default(0)
+  serviceCharge Int            @default(0)
+  tax           Int            @default(0)
+  total         Int
+  cashierId     String?
+  cashier       User?          @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  cancelReason  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  confirmedAt   DateTime?
+  preparingAt   DateTime?
+  readyAt       DateTime?
+  completedAt   DateTime?
+  paidAt        DateTime?
+
+  items    OrderItem[]
+  payments Payment[]
+
+  @@unique([outletId, businessDate, queueNumber])
+  @@index([outletId, status])
+  @@index([outletId, createdAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  productId String?
+  product   Product? @relation(fields: [productId], references: [id], onDelete: SetNull)
+  name      String
+  /// Harga satuan termasuk modifier
+  unitPrice Int
+  quantity  Int
+  /// Snapshot: [{ group, option, priceDelta }]
+  modifiers Json     @default("[]")
+  note      String?
+  lineTotal Int
+  /// Tandai sudah disiapkan di layar dapur
+  isDone    Boolean  @default(false)
+  /// Jumlah yang sudah dibayar (untuk split bill per item)
+  paidQty   Int      @default(0)
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  orderId         String
+  order           Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  method          PaymentMethod
+  state           PaymentState  @default(PENDING)
+  amount          Int
+  label           String?
+  cashReceived    Int?
+  changeAmount    Int?
+  reference       String?
+  /// order_id yang dikirim ke Midtrans
+  gatewayOrderId  String?       @unique
+  snapToken       String?
+  snapRedirectUrl String?
+  gatewayType     String?
+  gatewayRaw      Json?
+  shiftId         String?
+  shift           Shift?        @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  receivedById    String?
+  receivedBy      User?         @relation(fields: [receivedById], references: [id], onDelete: SetNull)
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  paidAt          DateTime?
+
+  @@index([orderId])
+}
+
+model Shift {
+  id           String    @id @default(cuid())
+  outletId     String
+  outlet       Outlet    @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  openedAt     DateTime  @default(now())
+  closedAt     DateTime?
+  openingCash  Int       @default(0)
+  /// Kas fisik yang dihitung saat tutup
+  closingCash  Int?
+  /// Kas yang seharusnya ada (opening + penjualan tunai)
+  expectedCash Int?
+  note         String?
+  payments     Payment[]
+
+  @@index([outletId, userId, closedAt])
+}
+
+enum RequestType {
+  CALL_WAITER
+  REQUEST_BILL
+}
+
+model ServiceRequest {
+  id         String      @id @default(cuid())
+  outletId   String
+  outlet     Outlet      @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  tableId    String
+  table      DiningTable @relation(fields: [tableId], references: [id], onDelete: Cascade)
+  type       RequestType
+  note       String?
+  resolvedAt DateTime?
+  createdAt  DateTime    @default(now())
+
+  @@index([outletId, resolvedAt])
+}
