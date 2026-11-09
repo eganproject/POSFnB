@@ -1,14 +1,24 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/session";
 import { ROLE_HOME } from "@/lib/constants";
+import { googleAuthEnabled } from "@/lib/auth";
 import { LoginForm } from "./login-form";
+
+const GOOGLE_ERRORS: Record<string, string> = {
+  signup_disabled: "Email Google ini belum terdaftar sebagai staf. Minta owner menambahkan email Anda terlebih dahulu.",
+  account_not_linked: "Akun Google tidak bisa ditautkan ke akun staf ini. Coba masuk dengan email & password.",
+  unable_to_create_session: "Akun Anda dinonaktifkan. Hubungi owner.",
+  email_not_found: "Akun Google tidak memberikan alamat email.",
+  access_denied: "Login Google dibatalkan.",
+};
 
 export const metadata = { title: "Masuk" };
 
-export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string }> }) {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
   const user = await getCurrentUser();
   if (user) redirect(ROLE_HOME[user.role]);
-  const { next } = await searchParams;
+  const { next, error } = await searchParams;
+  const errorMessage = error ? (GOOGLE_ERRORS[error] ?? "Gagal masuk dengan Google. Silakan coba lagi.") : undefined;
   return (
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-sidebar p-12 text-sidebar-foreground lg:flex lg:flex-col lg:justify-between">
@@ -43,9 +53,16 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
               <span className="grid size-9 place-items-center rounded-xl bg-primary text-lg">🍽️</span> Santap POS
             </div>
             <h2 className="text-2xl font-bold tracking-tight">Masuk ke akun staf</h2>
-            <p className="text-sm text-muted-foreground">Gunakan email & password yang diberikan owner.</p>
+            <p className="text-sm text-muted-foreground">{googleAuthEnabled
+                ? "Gunakan email & password dari owner, atau akun Google dengan email yang sudah didaftarkan."
+                : "Gunakan email & password yang diberikan owner."}</p>
           </div>
-          <LoginForm next={next} showDemo={process.env.NODE_ENV !== "production" || process.env.SHOW_DEMO_LOGIN === "true"} />
+          {errorMessage && (
+            <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+              {errorMessage}
+            </div>
+          )}
+          <LoginForm next={next} googleEnabled={googleAuthEnabled} showDemo={process.env.NODE_ENV !== "production" || process.env.SHOW_DEMO_LOGIN === "true"} />
         </div>
       </main>
     </div>
