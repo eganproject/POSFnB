@@ -110,6 +110,34 @@ Jika nanti punya URL publik, isi **Payment Notification URL** di dashboard Midtr
 
 ---
 
+## 🔐 Login dengan Google (opsional, gratis)
+
+Selain email + password, staf bisa masuk dengan tombol **Masuk dengan Google**. Login ini memakai Better Auth (data user tetap di database Santap POS), bukan Firebase.
+
+**Aturan akses:** hanya email yang **sudah didaftarkan owner** di menu Pengguna yang bisa masuk. Peran (owner/kasir/dapur/pelayan) mengikuti data yang dibuat owner. Akun Google yang belum terdaftar ditolak dan tidak dibuatkan akun baru, jadi orang asing tidak pernah mendapat akses. Akun yang dinonaktifkan owner juga tidak bisa masuk lewat Google.
+
+Tanpa `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, tombol Google disembunyikan.
+
+### Membuat OAuth Client di Google Cloud Console
+1. Buka <https://console.cloud.google.com>, buat project baru (mis. `santap-pos`).
+2. **APIs & Services → OAuth consent screen** (di konsol baru bernama **Google Auth Platform**):
+   - User type **External**, isi nama aplikasi & email dukungan.
+   - Selama status **Testing**, tambahkan email staf yang akan login di bagian **Test users** (maks. 100 user, gratis).
+3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**:
+   - Application type: **Web application**
+   - **Authorized JavaScript origins:** `http://localhost:3000`
+   - **Authorized redirect URIs:** `http://localhost:3000/api/auth/callback/google`
+4. Salin **Client ID** dan **Client secret** ke `.env`:
+   ```env
+   GOOGLE_CLIENT_ID="xxxx.apps.googleusercontent.com"
+   GOOGLE_CLIENT_SECRET="GOCSPX-xxxx"
+   ```
+5. Pastikan `BETTER_AUTH_URL="http://localhost:3000"`, lalu restart `pnpm dev`.
+
+**Catatan:** Google hanya menerima redirect ke `localhost` atau domain HTTPS, bukan IP LAN seperti `http://192.168.x.x:3000`. Jadi saat development, login Google dipakai dari browser di PC yang menjalankan aplikasi (`http://localhost:3000/login`). Di HP lewat IP LAN, staf tetap bisa masuk dengan email + password. Menu QR untuk customer tidak memerlukan login.
+
+---
+
 ## 🧭 Alur status pesanan
 
 ```
