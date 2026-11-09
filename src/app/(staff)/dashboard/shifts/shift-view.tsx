@@ -19,6 +19,7 @@ type Current = {
   openedAt: string;
   openingCash: number;
   cashSales: number;
+  cashRefunds: number;
   totalSales: number;
   expectedCash: number;
   byMethod: { method: PaymentMethod; amount: number; count: number }[];
@@ -53,6 +54,7 @@ export function ShiftView({ current, history }: { current: Current; history: { i
                   <span>Total penjualan</span>
                   <span className="tabular">{formatRupiah(current.totalSales)}</span>
                 </div>
+                {current.cashRefunds > 0 && <Line l="Refund tunai (keluar dari laci)" v={-current.cashRefunds} />}
                 <div className="flex justify-between font-bold text-primary">
                   <span>Kas seharusnya di laci</span>
                   <span className="tabular">{formatRupiah(current.expectedCash)}</span>

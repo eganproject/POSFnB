@@ -21,6 +21,8 @@ export type MenuOutlet = {
   address: string | null;
   taxRate: number;
   serviceRate: number;
+  /** Pembayaran online (Midtrans / demo) tersedia */
+  onlinePay: boolean;
 };
 
 export function MenuApp({

@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import {
-  BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone,
+  BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone, Undo2, History,
 } from "lucide-react";
 
 export const NAV = [
@@ -13,6 +13,8 @@ export const NAV = [
   { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/tables", label: "Meja & QR", icon: QrCode, roles: ["OWNER", "KASIR", "PELAYAN"] as Role[], group: "Kelola" },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, roles: ["OWNER"] as Role[], group: "Kelola" },
+  { href: "/dashboard/refunds", label: "Refund", icon: Undo2, roles: ["OWNER"] as Role[], group: "Kelola" },
+  { href: "/dashboard/activity", label: "Log aktivitas", icon: History, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/outlets", label: "Outlet", icon: Store, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/users", label: "Pengguna", icon: Users, roles: ["OWNER"] as Role[], group: "Kelola" },
 ];

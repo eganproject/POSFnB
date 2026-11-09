@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { getMenuForOutlet } from "@/server/menu";
+import { isOnlinePaymentAvailable } from "@/server/midtrans";
 import { MenuApp } from "@/components/customer/menu-app";
 import { ClosedNotice } from "@/components/customer/closed-notice";
 
@@ -24,7 +25,7 @@ export default async function TakeawayMenuPage({ params }: Props) {
   const categories = await getMenuForOutlet(outlet.id);
   return (
     <MenuApp
-      outlet={{ id: outlet.id, name: outlet.name, address: outlet.address, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate }}
+      outlet={{ id: outlet.id, name: outlet.name, address: outlet.address, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate, onlinePay: isOnlinePaymentAvailable() }}
       table={null}
       categories={categories}
     />

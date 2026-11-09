@@ -138,6 +138,24 @@ Tanpa `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, tombol Google disembunyikan.
 
 ---
 
+## 🛡️ Sebelum online (server sungguhan)
+
+- **Jangan jalankan `pnpm db:seed` di server.** Seed menghapus semua data dan membuat akun demo berpassword `password123` (ditolak otomatis bila `NODE_ENV=production`). Buat akun owner pertama dengan:
+  ```bash
+  OWNER_EMAIL=anda@gmail.com OWNER_NAME="Nama Anda" OWNER_PASSWORD='password-kuat-min-10' pnpm create-owner
+  ```
+- **`BETTER_AUTH_SECRET` wajib diganti** (`openssl rand -base64 32`). Di produksi server menolak menyala bila masih contoh.
+- **Mode demo pembayaran otomatis mati di produksi.** Tanpa key Midtrans, customer hanya bisa "bayar di kasir". `ALLOW_DEMO_PAYMENT=true` hanya untuk server demo tanpa uang sungguhan.
+- **Database:** port Postgres hanya terbuka untuk komputer itu sendiri (`127.0.0.1`). Ganti `POSTGRES_PASSWORD` dan `DATABASE_URL` sebelum container pertama kali dibuat.
+- Halaman **Ringkasan** owner menampilkan peringatan bila masih ada yang belum beres (akun berpassword demo, secret, Midtrans sandbox, dan lainnya).
+
+### Refund, diskon, dan log aktivitas
+- Pesanan lunas yang dibatalkan owner, serta pembayaran online yang masuk dobel atau telat (mis. setelah customer pindah ke bayar di kasir), muncul di **Refund**. Kembalikan uangnya lalu klik **Catat refund**. Refund tunai mengurangi kas shift yang sedang dibuka.
+- Kasir hanya boleh memberi diskon sampai **batas diskon kasir** per outlet (default 20%, atur di menu Outlet), dan wajib mengisi alasan. Owner tidak dibatasi.
+- Diskon, pembatalan (wajib alasan), perubahan item, refund, dan pembayaran janggal tercatat di **Log aktivitas**.
+
+---
+
 ## 🧭 Alur status pesanan
 
 ```
@@ -179,7 +197,9 @@ src/
 | `pnpm db:seed` | Isi ulang data contoh (menghapus data lama) |
 | `pnpm db:reset` | Reset database + migrasi + seed |
 | `pnpm db:studio` | Lihat isi database di browser (Prisma Studio) |
-| `pnpm test` | Unit test (perhitungan total, split bill, Midtrans) |
+| `pnpm create-owner` | Buat akun owner di server (lihat bagian "Sebelum online") |
+| `pnpm test` | Unit test (perhitungan total, split bill, Midtrans, refund) |
+| `TEST_DATABASE=1 pnpm test` | Ikut menjalankan tes pembayaran ke database lokal yang sudah di-seed |
 | `pnpm typecheck` / `pnpm lint` | Pemeriksaan kode |
 
 ## 📝 Catatan

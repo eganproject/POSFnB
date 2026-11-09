@@ -5,11 +5,14 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      # Di server, isi POSTGRES_PASSWORD di file .env (dan samakan dengan DATABASE_URL).
+      # Catatan: password hanya dipakai saat volume database pertama kali dibuat.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: posfnb
       TZ: Asia/Jakarta
     ports:
-      - "5432:5432"
+      # Hanya bisa diakses dari komputer/server ini sendiri, tidak terbuka ke internet
+      - "127.0.0.1:5432:5432"
     volumes:
       - posfnb-db:/var/lib/postgresql/data
     healthcheck:

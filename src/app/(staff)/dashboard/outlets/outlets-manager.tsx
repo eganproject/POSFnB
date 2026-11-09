@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Switch } from "@/components/ui/misc";
 import { saveOutlet } from "@/server/actions/admin";
 
-type O = { id?: string; name: string; slug: string; address: string | null; phone: string | null; taxRate: number; serviceRate: number; receiptFooter: string | null; isActive: boolean; tables?: number; staff?: number };
+type O = { id?: string; name: string; slug: string; address: string | null; phone: string | null; taxRate: number; serviceRate: number; maxDiscountPercent: number; receiptFooter: string | null; isActive: boolean; tables?: number; staff?: number };
 
 export function OutletsManager({ outlets }: { outlets: O[] }) {
   const router = useRouter();
@@ -61,7 +61,7 @@ export function OutletsManager({ outlets }: { outlets: O[] }) {
           </div>
         ))}
         <button
-          onClick={() => open({ name: "", slug: "", address: "", phone: "", taxRate: 10, serviceRate: 0, receiptFooter: "", isActive: true })}
+          onClick={() => open({ name: "", slug: "", address: "", phone: "", taxRate: 10, serviceRate: 0, maxDiscountPercent: 20, receiptFooter: "", isActive: true })}
           className="grid min-h-60 place-items-center rounded-2xl border-2 border-dashed text-muted-foreground transition hover:border-primary hover:text-primary"
         >
           <span className="flex flex-col items-center gap-2 font-semibold"><Plus className="size-6" /> Tambah outlet</span>
@@ -85,6 +85,7 @@ export function OutletsManager({ outlets }: { outlets: O[] }) {
                     phone: String(f.get("phone")) || null,
                     taxRate: Number(f.get("taxRate")) || 0,
                     serviceRate: Number(f.get("serviceRate")) || 0,
+                    maxDiscountPercent: Math.round(Number(f.get("maxDiscountPercent")) || 0),
                     receiptFooter: String(f.get("receiptFooter")) || null,
                     isActive: active,
                   });
@@ -108,6 +109,7 @@ export function OutletsManager({ outlets }: { outlets: O[] }) {
                 <Field label="Alamat" className="col-span-2"><Input name="address" defaultValue={edit.address ?? ""} /></Field>
                 <Field label="Pajak (%)"><Input name="taxRate" type="number" step="0.5" min={0} max={30} defaultValue={edit.taxRate} /></Field>
                 <Field label="Service charge (%)"><Input name="serviceRate" type="number" step="0.5" min={0} max={30} defaultValue={edit.serviceRate} /></Field>
+                <Field label="Batas diskon kasir (%)" className="col-span-2" hint="Owner tidak dibatasi"><Input name="maxDiscountPercent" type="number" step="1" min={0} max={100} defaultValue={edit.maxDiscountPercent} /></Field>
                 <Field label="Teks bawah struk" className="col-span-2"><Textarea name="receiptFooter" defaultValue={edit.receiptFooter ?? ""} rows={2} /></Field>
               </div>
               <label className="flex items-center justify-between rounded-xl border p-3 text-sm">

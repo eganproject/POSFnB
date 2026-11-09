@@ -32,7 +32,7 @@ export function CartSheet({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-  const [pay, setPay] = useState<"ONLINE" | "CASHIER">("ONLINE");
+  const [pay, setPay] = useState<"ONLINE" | "CASHIER">(outlet.onlinePay ? "ONLINE" : "CASHIER");
   const [submitting, setSubmitting] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -165,7 +165,9 @@ export function CartSheet({
                   {[
                     { v: "ONLINE" as const, icon: CreditCard, title: "Bayar sekarang", desc: "QRIS, GoPay, ShopeePay, Virtual Account, kartu" },
                     { v: "CASHIER" as const, icon: Banknote, title: "Bayar di kasir", desc: "Pesanan dikonfirmasi staf, bayar tunai / EDC" },
-                  ].map((o) => (
+                  ]
+                    .filter((o) => o.v !== "ONLINE" || outlet.onlinePay)
+                    .map((o) => (
                     <button
                       key={o.v}
                       type="button"

@@ -35,3 +35,35 @@ export function splitAmount(
   // Pajak, service & diskon dibagi proporsional terhadap subtotal
   return Math.min(order.remaining, Math.round((itemsSubtotal * order.total) / Math.max(1, order.subtotal)));
 }
+
+export type MoneyInput = {
+  total: number;
+  status: string;
+  paymentStatus: string;
+  payments: { state: string; amount: number }[];
+  refunds: { amount: number }[];
+};
+
+/**
+ * Posisi uang satu pesanan.
+ * - paid: total pembayaran sukses
+ * - refunded: total yang sudah dikembalikan
+ * - refundDue: uang customer yang harus dikembalikan (pesanan batal yang sudah dibayar,
+ *   atau pembayaran dobel / telat yang membuat lebih bayar)
+ */
+export function moneyState(o: MoneyInput) {
+  const paid = o.payments.filter((p) => p.state === "SUCCESS").reduce((s, p) => s + p.amount, 0);
+  const refunded = o.refunds.reduce((s, r) => s + r.amount, 0);
+  const net = paid - refunded;
+  const kept = o.status === "CANCELLED" ? 0 : o.total;
+  // Pesanan lama berstatus "Refund" tanpa catatan refund dianggap sudah beres
+  const legacyRefunded = o.paymentStatus === "REFUNDED" && o.refunds.length === 0;
+  const refundDue = legacyRefunded ? 0 : Math.max(0, net - kept);
+  const cancelled = o.status === "CANCELLED";
+  let paymentStatus: "UNPAID" | "PARTIAL" | "PAID" | "REFUNDED";
+  if (legacyRefunded || (cancelled && paid > 0 && net <= 0)) paymentStatus = "REFUNDED";
+  else if (net <= 0 && !(o.total === 0 && !cancelled)) paymentStatus = "UNPAID";
+  else if (net >= o.total) paymentStatus = "PAID";
+  else paymentStatus = "PARTIAL";
+  return { paid, refunded, net, refundDue, remaining: Math.max(0, kept - net), paymentStatus };
+}
