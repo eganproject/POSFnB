@@ -85,7 +85,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           <CardContent>
             {top.length ? (
               <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
+                <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr className="border-b">
                     <th className="py-2 font-medium">#</th>
                     <th className="py-2 font-medium">Menu</th>
@@ -93,9 +93,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                     <th className="py-2 text-right font-medium">Penjualan</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-border/70">
                   {top.map((t, i) => (
-                    <tr key={t.name}>
+                    <tr key={t.name} className="transition-colors hover:bg-muted/40">
                       <td className="py-2 text-muted-foreground">{i < 3 ? ["🥇", "🥈", "🥉"][i] : i + 1}</td>
                       <td className="py-2 font-medium">{t.name}</td>
                       <td className="py-2 text-right tabular">{t.qty}</td>

@@ -16,10 +16,10 @@ export function DialogContent({
 }: React.ComponentProps<typeof D.Content> & { hideClose?: boolean }) {
   return (
     <D.Portal>
-      <D.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] data-[state=open]:animate-in data-[state=open]:fade-in-0" />
+      <D.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] animate-fade-in" />
       <D.Content
         className={cn(
-          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl animate-fade-up",
+          "fixed left-1/2 top-1/2 z-50 grid max-h-[calc(100dvh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-2xl border bg-card p-6 shadow-2xl animate-scale-in",
           className
         )}
         {...props}
@@ -57,10 +57,10 @@ export function SheetContent({
 }: React.ComponentProps<typeof D.Content>) {
   return (
     <D.Portal>
-      <D.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px]" />
+      <D.Overlay className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[2px] animate-fade-in" />
       <D.Content
         className={cn(
-          "fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l bg-card shadow-2xl animate-[fade-up_0.25s_ease-out] sm:rounded-l-2xl",
+          "fixed inset-y-0 right-0 z-50 flex w-full max-w-md flex-col border-l bg-card shadow-2xl animate-[slide-in-right_0.3s_cubic-bezier(0.2,0.9,0.3,1)] sm:rounded-l-2xl",
           className
         )}
         {...props}
