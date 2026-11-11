@@ -57,10 +57,9 @@ export default async function OverviewPage() {
         actions={
           <>
             <Button asChild variant="outline">
-              <Link href="/dashboard/reports">Laporan lengkap</Link>
-            </Button>
-            <Button asChild>
-              <Link href="/pos">Buka kasir</Link>
+              <Link href="/dashboard/reports">
+                Laporan lengkap <ArrowRight />
+              </Link>
             </Button>
           </>
         }
@@ -97,7 +96,7 @@ export default async function OverviewPage() {
         </Card>
       )}
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard
           tone="primary"
           label="Pendapatan hari ini"
@@ -163,10 +162,10 @@ export default async function OverviewPage() {
           {recent.length === 0 ? (
             <EmptyState icon={<Receipt />} title="Belum ada pesanan" />
           ) : (
-            <div className="divide-y">
+            <div className="stagger -mx-2 divide-y divide-border/70">
               {recent.map((o) => (
-                <Link key={o.id} href={`/dashboard/orders?id=${o.id}`} className="flex items-center gap-4 py-3 transition hover:bg-muted/40">
-                  <span className="grid size-11 place-items-center rounded-xl bg-muted font-bold tabular">#{pad(o.queueNumber)}</span>
+                <Link key={o.id} href={`/dashboard/orders?id=${o.id}`} className="group flex items-center gap-4 rounded-xl px-2 py-3 transition hover:bg-muted/50">
+                  <span className="grid size-11 place-items-center rounded-xl bg-muted font-bold tabular transition group-hover:bg-primary/10 group-hover:text-primary">#{pad(o.queueNumber)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate font-medium">{o.customerName || "Tanpa nama"} · {o.table?.name ?? "Takeaway"}</p>
                     <p className="text-xs text-muted-foreground">

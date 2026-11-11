@@ -106,8 +106,8 @@ export function EmptyState({
   className?: string;
 }) {
   return (
-    <div className={cn("flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-10 text-center", className)}>
-      {icon && <div className="grid size-14 place-items-center rounded-2xl bg-muted text-muted-foreground [&_svg]:size-7">{icon}</div>}
+    <div className={cn("flex flex-col items-center justify-center gap-3 rounded-2xl border border-dashed p-10 text-center animate-fade-up", className)}>
+      {icon && <div className="grid size-14 place-items-center rounded-2xl bg-gradient-to-br from-primary/15 to-amber-400/10 text-primary ring-8 ring-primary/[0.04] [&_svg]:size-7">{icon}</div>}
       <div className="space-y-1">
         <p className="font-semibold">{title}</p>
         {description && <p className="max-w-sm text-sm text-muted-foreground">{description}</p>}

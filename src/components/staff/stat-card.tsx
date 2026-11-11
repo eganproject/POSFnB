@@ -16,7 +16,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        "relative overflow-hidden rounded-2xl border p-5 shadow-xs",
+        "relative overflow-hidden rounded-2xl border p-5 shadow-xs transition duration-300 hover:-translate-y-0.5 hover:shadow-md",
         tone === "primary" ? "border-transparent bg-gradient-to-br from-primary to-[oklch(0.72_0.17_60)] text-white" : "bg-card"
       )}
     >
@@ -51,7 +51,7 @@ export function BarList({ items, format }: { items: { name: string; value: numbe
             </span>
           </div>
           <div className="ml-6 h-1.5 overflow-hidden rounded-full bg-muted">
-            <div className="h-full rounded-full bg-primary/80" style={{ width: `${(i.value / max) * 100}%` }} />
+            <div className="h-full origin-left rounded-full bg-gradient-to-r from-primary to-amber-500 animate-[grow-x_0.7s_cubic-bezier(0.2,0.8,0.3,1)_backwards]" style={{ width: `${(i.value / max) * 100}%` }} />
           </div>
         </li>
       ))}

@@ -3,6 +3,8 @@ import {
   BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone, Undo2, History,
 } from "lucide-react";
 
+export const SIDEBAR_COOKIE = "sidebar_collapsed";
+
 export const NAV = [
   { href: "/dashboard", label: "Ringkasan", icon: LayoutDashboard, roles: ["OWNER"] as Role[] },
   { href: "/dashboard/orders", label: "Pesanan", icon: ClipboardList, roles: ["OWNER", "KASIR", "PELAYAN"] as Role[] },
@@ -18,3 +20,16 @@ export const NAV = [
   { href: "/dashboard/outlets", label: "Outlet", icon: Store, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/users", label: "Pengguna", icon: Users, roles: ["OWNER"] as Role[], group: "Kelola" },
 ];
+
+export function isNavActive(href: string, pathname: string) {
+  return href === "/dashboard" ? pathname === href : pathname === href || pathname.startsWith(href + "/");
+}
+
+/** Judul halaman untuk top bar, termasuk sub-halaman (mis. /dashboard/menu/new) */
+export function currentPage(pathname: string) {
+  const item = [...NAV].sort((a, b) => b.href.length - a.href.length).find((n) => isNavActive(n.href, pathname));
+  if (!item) return { section: "Dashboard", title: "Dashboard", icon: LayoutDashboard, sub: null as string | null };
+  const rest = pathname.slice(item.href.length).replace(/^\//, "");
+  const sub = rest ? (rest === "new" ? "Tambah baru" : "Ubah") : null;
+  return { section: item.group ?? "Operasional", title: item.label, icon: item.icon, sub, href: item.href };
+}
