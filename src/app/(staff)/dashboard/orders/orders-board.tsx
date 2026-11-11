@@ -366,13 +366,13 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
           <DialogHeader>
             <DialogTitle>Batalkan pesanan #{pad(o.queueNumber)}?</DialogTitle>
             <DialogDescription>
-              {o.paymentStatus !== "UNPAID" ? "Pesanan sudah dibayar dan akan ditandai refund." : "Customer akan melihat status dibatalkan."}
+              {o.paymentStatus !== "UNPAID" ? "Pesanan sudah dibayar. Setelah dibatalkan, kembalikan uang customer lalu catat di menu Refund." : "Customer akan melihat status dibatalkan."}
             </DialogDescription>
           </DialogHeader>
-          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Alasan (mis. stok habis)" />
+          <Textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="Alasan wajib diisi (mis. stok habis)" />
           <DialogFooter>
             <Button variant="outline" onClick={() => setCancelOpen(false)}>Kembali</Button>
-            <Button variant="destructive" loading={pending} onClick={() => run("CANCELLED", reason || undefined)}>
+            <Button variant="destructive" loading={pending} disabled={!reason.trim()} onClick={() => run("CANCELLED", reason.trim())}>
               Ya, batalkan
             </Button>
           </DialogFooter>

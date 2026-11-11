@@ -6,6 +6,9 @@ import { db } from "@/lib/db";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { businessDate, formatRupiah, pad, percentChange, shiftDate } from "@/lib/utils";
 import { bestSellers, dailySales, salesSummary } from "@/server/reports";
+import { ordersNeedingRefund } from "@/server/orders";
+import { accountsWithDemoPassword, configProblems } from "@/server/security";
+import { AlertTriangle } from "lucide-react";
 import { PageHeader } from "@/components/staff/page-header";
 import { BarList, StatCard } from "@/components/staff/stat-card";
 import { RevenueChart } from "@/components/staff/charts";
@@ -34,6 +37,13 @@ export default async function OverviewPage() {
       include: { table: { select: { name: true } } },
     }),
   ]);
+  const [refundDue, demoAccounts] = await Promise.all([ordersNeedingRefund(outlet.id), accountsWithDemoPassword()]);
+  const warnings = [
+    ...configProblems(),
+    ...(demoAccounts.length
+      ? [`${demoAccounts.length} akun masih memakai password demo "password123" (${demoAccounts.join(", ")}). Ganti password atau nonaktifkan di menu Pengguna sebelum online.`]
+      : []),
+  ];
   const activeCount = (s: string) => active.find((a) => a.status === s)?._count ?? 0;
   const revChange = percentChange(todayS.revenue, yestS.revenue);
   const hour = Number(new Intl.DateTimeFormat("en-GB", { hour: "numeric", hour12: false, timeZone: process.env.APP_TIMEZONE || "Asia/Jakarta" }).format(new Date()));
@@ -54,6 +64,37 @@ export default async function OverviewPage() {
           </>
         }
       />
+
+      {warnings.length > 0 && (
+        <Card className="border-amber-500/50 bg-amber-500/5">
+          <CardContent className="flex gap-3 p-4">
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-amber-600" />
+            <div className="space-y-1 text-sm">
+              <p className="font-semibold">Perlu dibereskan sebelum dipakai sungguhan</p>
+              <ul className="list-disc space-y-0.5 pl-4 text-muted-foreground">
+                {warnings.map((w) => (
+                  <li key={w}>{w}</li>
+                ))}
+              </ul>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+      {refundDue.length > 0 && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4">
+            <div className="text-sm">
+              <p className="font-semibold text-destructive">{refundDue.length} pesanan perlu refund</p>
+              <p className="text-muted-foreground">
+                Total {formatRupiah(refundDue.reduce((s, x) => s + x.money.refundDue, 0))} harus dikembalikan ke customer.
+              </p>
+            </div>
+            <Button asChild variant="outline">
+              <Link href="/dashboard/refunds">Lihat refund</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="stagger grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard

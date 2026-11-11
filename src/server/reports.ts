@@ -108,11 +108,15 @@ export async function shiftSummary(shiftId: string) {
   });
   const cash = byMethod.find((m) => m.method === "CASH")?._sum.amount ?? 0;
   const total = byMethod.reduce((s, m) => s + (m._sum.amount ?? 0), 0);
+  // Refund tunai diambil dari laci kas shift ini
+  const refundAgg = await db.refund.aggregate({ where: { shiftId, method: "CASH" }, _sum: { amount: true } });
+  const cashRefunds = refundAgg._sum.amount ?? 0;
   return {
     shift,
     byMethod: byMethod.map((m) => ({ method: m.method, amount: m._sum.amount ?? 0, count: m._count })),
     cashSales: cash,
     totalSales: total,
-    expectedCash: shift.openingCash + cash,
+    cashRefunds,
+    expectedCash: shift.openingCash + cash - cashRefunds,
   };
 }

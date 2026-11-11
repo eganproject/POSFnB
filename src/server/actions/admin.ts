@@ -8,6 +8,7 @@ import { db } from "@/lib/db";
 import { assertUser } from "@/lib/session";
 import { slugify } from "@/lib/utils";
 import { channels, publish } from "@/lib/events";
+import { resetDemoPasswordCache } from "@/server/security";
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
 
@@ -42,6 +43,7 @@ const outletSchema = z.object({
   phone: z.string().trim().max(30).optional().nullable(),
   taxRate: z.number().min(0).max(30),
   serviceRate: z.number().min(0).max(30),
+  maxDiscountPercent: z.number().int().min(0).max(100),
   receiptFooter: z.string().trim().max(200).optional().nullable(),
   isActive: z.boolean(),
 });
@@ -286,6 +288,8 @@ export async function saveUser(input: z.input<typeof userSchema>): Promise<Resul
   try {
     const me = await owner();
     const { id, password, ...data } = userSchema.parse(input);
+    if (password && password === "password123") throw new Error("Jangan pakai password demo. Pilih password lain.");
+    resetDemoPasswordCache();
     if (data.role !== "OWNER" && !data.outletId) throw new Error("Staf harus ditempatkan di salah satu outlet.");
     if (id === me.id && (data.role !== "OWNER" || !data.isActive)) throw new Error("Anda tidak bisa menurunkan role / menonaktifkan akun sendiri.");
     const outletId = data.role === "OWNER" ? null : data.outletId;

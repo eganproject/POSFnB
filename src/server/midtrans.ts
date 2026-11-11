@@ -12,6 +12,21 @@ export function isMidtransEnabled() {
   return Boolean(process.env.MIDTRANS_SERVER_KEY && process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY);
 }
 
+/**
+ * Mode demo (simulasi bayar tanpa Midtrans) hanya boleh dipakai saat development.
+ * Di server produksi, mode ini mati kecuali ALLOW_DEMO_PAYMENT="true" diisi dengan sengaja
+ * (misalnya untuk server demo yang tidak menerima uang sungguhan).
+ */
+export function isDemoPaymentAllowed() {
+  if (isMidtransEnabled()) return false;
+  return process.env.NODE_ENV !== "production" || process.env.ALLOW_DEMO_PAYMENT === "true";
+}
+
+/** Pembayaran online tersedia jika Midtrans aktif, atau mode demo diizinkan */
+export function isOnlinePaymentAvailable() {
+  return isMidtransEnabled() || isDemoPaymentAllowed();
+}
+
 function authHeader() {
   const key = process.env.MIDTRANS_SERVER_KEY ?? "";
   return "Basic " + Buffer.from(`${key}:`).toString("base64");
@@ -79,13 +94,31 @@ export async function getTransactionStatus(orderId: string): Promise<MidtransSta
   return json;
 }
 
+/**
+ * Matikan transaksi Snap yang masih pending di Midtrans agar customer tidak bisa
+ * menyelesaikannya lagi (mis. setelah pindah ke bayar di kasir). Best effort.
+ */
+export async function expireTransaction(orderId: string) {
+  if (!isMidtransEnabled()) return;
+  try {
+    await fetch(`${CORE_URL}/v2/${encodeURIComponent(orderId)}/expire`, {
+      method: "POST",
+      headers: { Accept: "application/json", Authorization: authHeader() },
+      cache: "no-store",
+    });
+  } catch (e) {
+    console.error("Gagal expire transaksi Midtrans", orderId, e);
+  }
+}
+
 export function verifySignature(n: MidtransStatus) {
   const key = process.env.MIDTRANS_SERVER_KEY ?? "";
   const expected = crypto
     .createHash("sha512")
     .update(`${n.order_id}${n.status_code}${n.gross_amount}${key}`)
     .digest("hex");
-  return Boolean(n.signature_key) && expected === n.signature_key;
+  if (!key || typeof n.signature_key !== "string" || n.signature_key.length !== expected.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(expected), Buffer.from(n.signature_key));
 }
 
 export function mapMidtransState(n: Pick<MidtransStatus, "transaction_status" | "fraud_status">): PaymentState {

@@ -89,7 +89,17 @@ const dateKey = (d: Date) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
 async function main() {
+  // Seed menghapus SEMUA data dan membuat akun demo berpassword "password123".
+  // Jangan pernah dijalankan di server produksi. Untuk akun owner pertama di server,
+  // pakai: pnpm create-owner
+  if (process.env.NODE_ENV === "production" && process.env.SEED_FORCE !== "true") {
+    console.error("❌ Seed demo ditolak karena NODE_ENV=production (akan menghapus semua data).");
+    console.error("   Buat akun owner dengan: pnpm create-owner");
+    process.exit(1);
+  }
   console.log("🧹 Membersihkan data lama…");
+  await db.auditLog.deleteMany();
+  await db.refund.deleteMany();
   await db.serviceRequest.deleteMany();
   await db.payment.deleteMany();
   await db.orderItem.deleteMany();

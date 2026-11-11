@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { expireStaleOrders } from "@/server/orders";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { getMenuForOutlet } from "@/server/menu";
-import { isMidtransEnabled } from "@/server/midtrans";
+import { isMidtransEnabled, isOnlinePaymentAvailable } from "@/server/midtrans";
 import { PosApp } from "./pos-app";
 
 export const metadata = { title: "Kasir" };
@@ -38,7 +38,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   return (
     <PosApp
       user={{ name: user.name, role: user.role }}
-      outlet={{ id: outlet.id, name: outlet.name, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate }}
+      outlet={{ id: outlet.id, name: outlet.name, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate, maxDiscountPercent: outlet.maxDiscountPercent }}
       categories={categories}
       tables={tables.map((t) => ({ id: t.id, name: t.name, area: t.area, capacity: t.capacity, busy: t.orders.length > 0 }))}
       openBills={openBills.map((o) => ({
@@ -57,6 +57,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
       requestCount={requests}
       payment={{
         demo: !isMidtransEnabled(),
+        online: isOnlinePaymentAvailable(),
         clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? "",
         isProduction: process.env.MIDTRANS_IS_PRODUCTION === "true",
       }}

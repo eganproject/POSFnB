@@ -28,6 +28,7 @@ export default async function ShiftsPage() {
                 openedAt: current.shift.openedAt.toISOString(),
                 openingCash: current.shift.openingCash,
                 cashSales: current.cashSales,
+                cashRefunds: current.cashRefunds,
                 totalSales: current.totalSales,
                 expectedCash: current.expectedCash,
                 byMethod: current.byMethod,

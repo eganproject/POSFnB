@@ -23,6 +23,7 @@ export default async function OutletsPage() {
           phone: o.phone,
           taxRate: o.taxRate,
           serviceRate: o.serviceRate,
+          maxDiscountPercent: o.maxDiscountPercent,
           receiptFooter: o.receiptFooter,
           isActive: o.isActive,
           tables: o._count.tables,

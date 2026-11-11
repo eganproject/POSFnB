@@ -3,10 +3,11 @@ import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import type { OrderStatus } from "@prisma/client";
 import { db } from "@/lib/db";
+import { formatRupiah } from "@/lib/utils";
 import { assertUser, canAccessOutlet, getActiveOutlet } from "@/lib/session";
 import { channels, publish } from "@/lib/events";
 import { OrderError, cartLineSchema, computeTotals } from "@/server/pricing";
-import { addManualPayment, createGatewayPayment, createOrder, setOrderStatus } from "@/server/orders";
+import { addManualPayment, audit, createGatewayPayment, createOrder, payOrdersBatch, recordRefund, setOrderStatus, voidPendingGatewayPayments } from "@/server/orders";
 import { isMidtransEnabled } from "@/server/midtrans";
 import { shiftSummary } from "@/server/reports";
 
@@ -38,7 +39,7 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus, re
   try {
     const roles = status === "CANCELLED" ? (["OWNER", "KASIR", "PELAYAN"] as const) : undefined;
     const { user, outlet } = await ctx(roles ? [...roles] : undefined);
-    await setOrderStatus(orderId, status, { role: user.role, reason, outletId: outlet.id });
+    await setOrderStatus(orderId, status, { role: user.role, reason, outletId: outlet.id, userId: user.id });
     revalidatePath("/dashboard/orders");
     return { ok: true, data: undefined };
   } catch (e) {
@@ -98,6 +99,7 @@ const posOrderSchema = z.object({
   customerName: z.string().trim().max(60).optional().nullable(),
   note: z.string().trim().max(300).optional().nullable(),
   discount: z.number().int().min(0).default(0),
+  discountReason: z.string().trim().max(120).optional().nullable(),
   lines: z.array(cartLineSchema).min(1, "Keranjang masih kosong."),
 });
 
@@ -105,7 +107,10 @@ export async function createPosOrder(input: z.input<typeof posOrderSchema>): Pro
   try {
     const { user, outlet } = await ctx(["OWNER", "KASIR", "PELAYAN"]);
     const data = posOrderSchema.parse(input);
-    if (data.discount > 0 && user.role === "PELAYAN") throw new OrderError("Pelayan tidak bisa memberi diskon.");
+    if (data.discount > 0) {
+      if (user.role === "PELAYAN") throw new OrderError("Pelayan tidak bisa memberi diskon.");
+      if (!data.discountReason || data.discountReason.length < 3) throw new OrderError("Isi alasan diskon.");
+    }
     if (data.type === "DINE_IN" && !data.tableId) throw new OrderError("Pilih meja untuk pesanan dine-in.");
     const order = await createOrder({
       outletId: outlet.id,
@@ -117,7 +122,20 @@ export async function createPosOrder(input: z.input<typeof posOrderSchema>): Pro
       note: data.note,
       cashierId: user.id,
       discount: data.discount,
+      discountReason: data.discount > 0 ? data.discountReason : null,
+      // Kasir dibatasi persentase diskon outlet; owner bebas
+      maxDiscountPercent: user.role === "OWNER" ? null : outlet.maxDiscountPercent,
     });
+    if (order.discount > 0) {
+      await audit(db, {
+        outletId: outlet.id,
+        userId: user.id,
+        action: "DISCOUNT",
+        orderId: order.id,
+        message: `Diskon ${formatRupiah(order.discount)} untuk pesanan #${order.queueNumber}: ${data.discountReason}`,
+        detail: { discount: order.discount, subtotal: order.subtotal },
+      });
+    }
     return { ok: true, data: { orderId: order.id, total: order.total } };
   } catch (e) {
     return fail(e);
@@ -261,33 +279,15 @@ export async function payOrdersTogether(input: z.input<typeof tablePaySchema>): 
     const data = tablePaySchema.parse(input);
     const shift = await openShiftFor(user.id, outlet.id);
     if (!shift) throw new OrderError("Buka shift kasir terlebih dahulu.");
-    const orders = await db.order.findMany({
-      where: { id: { in: data.orderIds }, outletId: outlet.id, status: { not: "CANCELLED" } },
-      include: { payments: { where: { state: "SUCCESS" } } },
-      orderBy: { createdAt: "asc" },
+    const { change, total } = await payOrdersBatch({
+      outletId: outlet.id,
+      orderIds: data.orderIds,
+      method: data.method,
+      cashReceived: data.cashReceived ?? null,
+      reference: data.reference ?? null,
+      shiftId: shift.id,
+      userId: user.id,
     });
-    const due = orders
-      .map((o) => ({ id: o.id, remaining: o.total - o.payments.reduce((s, p) => s + p.amount, 0) }))
-      .filter((o) => o.remaining > 0);
-    if (!due.length) throw new OrderError("Semua tagihan sudah lunas.");
-    const total = due.reduce((s, o) => s + o.remaining, 0);
-    const cash = data.method === "CASH" ? data.cashReceived ?? total : null;
-    if (cash !== null && cash < total) throw new OrderError("Uang diterima kurang dari total tagihan.");
-    const change = cash !== null ? cash - total : 0;
-    for (const [i, o] of due.entries()) {
-      const last = i === due.length - 1;
-      await addManualPayment({
-        orderId: o.id,
-        method: data.method,
-        amount: o.remaining,
-        // Kembalian dicatat di pesanan terakhir agar rekap kas tetap akurat
-        cashReceived: cash !== null ? o.remaining + (last ? change : 0) : null,
-        reference: data.reference ?? null,
-        label: due.length > 1 ? "Gabungan meja" : null,
-        shiftId: shift.id,
-        userId: user.id,
-      });
-    }
     revalidatePath("/pos");
     return { ok: true, data: { change, total } };
   } catch (e) {
@@ -297,28 +297,67 @@ export async function payOrdersTogether(input: z.input<typeof tablePaySchema>): 
 
 // ───────── Ubah item pesanan (sebelum dibayar) ─────────
 
-export async function adjustOrderItem(itemId: string, quantity: number): Promise<Result> {
+export async function adjustOrderItem(itemId: string, quantity: number, reason?: string): Promise<Result> {
   try {
-    const { outlet } = await ctx(["OWNER", "KASIR"]);
-    const item = await db.orderItem.findUnique({ where: { id: itemId }, include: { order: { include: { items: true, outlet: true } } } });
-    const order = item?.order;
-    if (!item || !order || order.outletId !== outlet.id) throw new OrderError("Item tidak ditemukan.");
-    if (order.paymentStatus !== "UNPAID") throw new OrderError("Pesanan yang sudah dibayar (sebagian) tidak bisa diubah.");
-    if (["COMPLETED", "CANCELLED"].includes(order.status)) throw new OrderError("Pesanan sudah selesai / dibatalkan.");
-    if (!Number.isInteger(quantity) || quantity < 0 || quantity > item.quantity) throw new OrderError("Jumlah tidak valid.");
-    if (quantity === 0 && order.items.length === 1) throw new OrderError("Ini item terakhir. Batalkan pesanan jika tidak jadi.");
+    const { user, outlet } = await ctx(["OWNER", "KASIR"]);
+    if (!Number.isInteger(quantity) || quantity < 0) throw new OrderError("Jumlah tidak valid.");
+    const first = await db.orderItem.findUnique({ where: { id: itemId }, select: { orderId: true } });
+    if (!first) throw new OrderError("Item tidak ditemukan.");
+    const orderId = first.orderId;
     await db.$transaction(async (tx) => {
+      // Kunci pesanan agar tidak bisa dibayar bersamaan saat item diubah
+      await tx.$queryRaw`SELECT id FROM "Order" WHERE id = ${orderId} FOR UPDATE`;
+      const item = await tx.orderItem.findUnique({ where: { id: itemId }, include: { order: { include: { items: true, outlet: true } } } });
+      const order = item?.order;
+      if (!item || !order || order.outletId !== outlet.id) throw new OrderError("Item tidak ditemukan.");
+      if (order.paymentStatus !== "UNPAID") throw new OrderError("Pesanan yang sudah dibayar (sebagian) tidak bisa diubah.");
+      if (["COMPLETED", "CANCELLED"].includes(order.status)) throw new OrderError("Pesanan sudah selesai / dibatalkan.");
+      if (quantity > item.quantity) throw new OrderError("Jumlah tidak valid.");
+      if (quantity === item.quantity) return;
+      if (quantity === 0 && order.items.length === 1) throw new OrderError("Ini item terakhir. Batalkan pesanan jika tidak jadi.");
       if (quantity === 0) await tx.orderItem.delete({ where: { id: itemId } });
       else await tx.orderItem.update({ where: { id: itemId }, data: { quantity, lineTotal: item.unitPrice * quantity } });
       const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
       const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
       await tx.order.update({ where: { id: order.id }, data: computeTotals(subtotal, order.outlet, order.discount) });
-      // Transaksi online lama nominalnya sudah tidak cocok
-      await tx.payment.updateMany({ where: { orderId: order.id, state: "PENDING" }, data: { state: "FAILED" } });
+      await audit(tx, {
+        outletId: outlet.id,
+        userId: user.id,
+        action: "ITEM_ADJUST",
+        orderId: order.id,
+        message: `${item.name} di pesanan #${order.queueNumber}: ${item.quantity} → ${quantity}${reason?.trim() ? ` (${reason.trim()})` : ""}`,
+        detail: { itemId, from: item.quantity, to: quantity, oldTotal: order.total },
+      });
     });
-    publish(channels.outlet(outlet.id), { type: "order.updated", orderId: order.id });
-    publish(channels.order(order.id), { type: "order.updated", orderId: order.id });
+    // Transaksi online lama nominalnya sudah tidak cocok
+    await voidPendingGatewayPayments(orderId);
+    publish(channels.outlet(outlet.id), { type: "order.updated", orderId });
+    publish(channels.order(orderId), { type: "order.updated", orderId });
     revalidatePath("/dashboard/orders");
+    return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+// ───────── Refund ─────────
+
+const refundSchema = z.object({
+  orderId: z.string().min(1),
+  amount: z.number().int().positive("Nominal refund tidak valid."),
+  method: z.enum(["CASH", "MIDTRANS", "QRIS_STATIC", "CARD", "TRANSFER"]),
+  reason: z.string().trim().min(3, "Isi alasan / catatan refund.").max(200),
+});
+
+/** Owner mencatat uang yang sudah dikembalikan ke customer */
+export async function refundOrder(input: z.input<typeof refundSchema>): Promise<Result> {
+  try {
+    const { user, outlet } = await ctx(["OWNER"]);
+    const data = refundSchema.parse(input);
+    await recordRefund({ ...data, outletId: outlet.id, userId: user.id });
+    revalidatePath("/dashboard/refunds");
+    revalidatePath("/dashboard/orders");
+    revalidatePath("/dashboard/shifts");
     return { ok: true, data: undefined };
   } catch (e) {
     return fail(e);

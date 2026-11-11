@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import type { Metadata } from "next";
 import { db } from "@/lib/db";
 import { getMenuForOutlet } from "@/server/menu";
+import { isOnlinePaymentAvailable } from "@/server/midtrans";
 import { MenuApp } from "@/components/customer/menu-app";
 import { ClosedNotice } from "@/components/customer/closed-notice";
 
@@ -29,6 +30,7 @@ export default async function TableMenuPage({ params }: Props) {
         address: table.outlet.address,
         taxRate: table.outlet.taxRate,
         serviceRate: table.outlet.serviceRate,
+        onlinePay: isOnlinePaymentAvailable(),
       }}
       table={{ name: table.name, area: table.area, token: table.qrToken }}
       categories={categories}
