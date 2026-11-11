@@ -229,7 +229,7 @@ export function ProductForm({ categories, initial }: { categories: { id: string;
         </div>
 
         {/* Preview */}
-        <div className="space-y-3 xl:sticky xl:top-6 xl:self-start">
+        <div className="space-y-3 xl:sticky xl:top-24 xl:self-start">
           <p className="text-sm font-semibold text-muted-foreground">Pratinjau di HP customer</p>
           <div className="overflow-hidden rounded-[2rem] border-8 border-foreground/90 bg-background shadow-xl">
             <ProductImage src={f.imageUrl} name={f.name || "Menu"} emoji={f.emoji || cat?.icon} className="aspect-[16/10]" emojiClassName="text-6xl" />
@@ -257,7 +257,7 @@ export function ProductForm({ categories, initial }: { categories: { id: string;
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/90 backdrop-blur lg:left-64">
+      <div className="fixed inset-x-0 bottom-0 z-30 border-t bg-card/90 backdrop-blur lg:left-[var(--sidebar-w)] transition-[left] duration-300">
         <div className="mx-auto flex max-w-7xl justify-end gap-2 px-4 py-3 sm:px-6 lg:px-8">
           <Button asChild variant="outline">
             <Link href="/dashboard/menu">Batal</Link>

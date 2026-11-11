@@ -1,6 +1,7 @@
 "use client";
 import { toast } from "sonner";
 import { useRealtime, type RealtimeMessage } from "@/hooks/use-realtime";
+import { pushAlert } from "./alerts-store";
 
 let audioCtx: AudioContext | null = null;
 /** Bunyi notifikasi singkat tanpa file audio */
@@ -33,12 +34,13 @@ export function LiveAlerts({ notifyOrders = true }: { notifyOrders?: boolean }) 
     (msg: RealtimeMessage) => {
       if (msg.type === "request.created") {
         chime(3);
-        toast.warning(
-          msg.kind === "REQUEST_BILL" ? `🧾 ${msg.tableName} minta bill` : `🛎️ ${msg.tableName} memanggil pelayan`,
-          { duration: 10000 }
-        );
+        const bill = msg.kind === "REQUEST_BILL";
+        const title = bill ? `${msg.tableName} minta bill` : `${msg.tableName} memanggil pelayan`;
+        pushAlert({ kind: bill ? "bill" : "waiter", title });
+        toast.warning(`${bill ? "🧾" : "🛎️"} ${title}`, { duration: 10000 });
       } else if (msg.type === "order.created" && notifyOrders && msg.source === "QR") {
         chime(2);
+        pushAlert({ kind: "order", title: msg.tableName ? `Pesanan QR baru dari ${msg.tableName}` : "Pesanan QR baru masuk" });
         toast.info("📱 Pesanan QR baru masuk", { duration: 5000 });
       }
     }

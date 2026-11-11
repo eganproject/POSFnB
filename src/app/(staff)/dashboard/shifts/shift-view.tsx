@@ -120,7 +120,7 @@ export function ShiftView({ current, history }: { current: Current; history: { i
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="text-left text-xs text-muted-foreground">
+                <thead className="text-left text-[11px] uppercase tracking-wider text-muted-foreground">
                   <tr className="border-b">
                     <th className="py-2 font-medium">Kasir / waktu</th>
                     <th className="py-2 text-right font-medium">Penjualan</th>
@@ -128,11 +128,11 @@ export function ShiftView({ current, history }: { current: Current; history: { i
                     <th className="py-2 text-right font-medium">Selisih</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y">
+                <tbody className="divide-y divide-border/70">
                   {history.map((h) => {
                     const d = h.closingCash - h.expectedCash;
                     return (
-                      <tr key={h.id}>
+                      <tr key={h.id} className="transition-colors hover:bg-muted/40">
                         <td className="py-2.5">
                           <p className="font-medium">{h.user}</p>
                           <p className="text-xs text-muted-foreground">
