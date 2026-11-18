@@ -33,6 +33,11 @@ export default async function TableMenuPage({ params }: Props) {
         taxRate: table.outlet.taxRate,
         serviceRate: table.outlet.serviceRate,
         onlinePay: await isOnlinePaymentAvailable(),
+        slug: table.outlet.slug,
+        openTime: table.outlet.openTime,
+        closeTime: table.outlet.closeTime,
+        timeZone: process.env.APP_TIMEZONE || "Asia/Jakarta",
+        takeawayEnabled: table.outlet.takeawayEnabled,
       }}
       table={{ name: table.name, area: table.area, token: table.qrToken }}
       categories={categories}
