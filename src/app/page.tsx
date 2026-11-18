@@ -52,6 +52,9 @@ export default async function Home() {
             <a href="#kunjungi" className="transition hover:text-cream">Kunjungi</a>
           </nav>
           <div className="flex items-center gap-2">
+            <Link href="/akun" className="rounded-full px-3 py-2 text-sm text-cream/75 transition hover:text-cream">
+              Akun saya
+            </Link>
             <Link href="/login" className="hidden rounded-full px-3 py-2 text-sm text-cream/75 transition hover:text-cream sm:block">
               Masuk staf
             </Link>
@@ -83,7 +86,7 @@ export default async function Home() {
                 href={menuHref}
                 className="inline-flex items-center gap-2 rounded-full bg-cream px-7 py-3.5 font-semibold text-olive-deep transition hover:brightness-95 active:scale-[0.98]"
               >
-                Lihat menu <ArrowRight className="size-4" />
+                {outlet?.takeawayEnabled ? "Pesan takeaway" : "Lihat menu"} <ArrowRight className="size-4" />
               </Link>
               <a
                 href={BRAND.links.maps}

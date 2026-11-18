@@ -1,13 +1,13 @@
 "use client";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { Bell, ChevronRight, Plus, Receipt, Search, ShoppingBag, Star, X } from "lucide-react";
+import { Bell, ChevronRight, Plus, Receipt, Search, ShoppingBag, Star, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import type { MenuCategory, MenuProduct } from "@/server/menu";
-import { cn, formatRupiah } from "@/lib/utils";
+import { cn, formatRupiah, initials } from "@/lib/utils";
 import { lineKey } from "@/lib/cart";
 import { recentOrders, useCart, type RememberedOrder } from "@/hooks/use-cart";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { ProductImage } from "@/components/shared/product-image";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { BRAND } from "@/lib/brand";
@@ -25,14 +25,77 @@ export type MenuOutlet = {
   serviceRate: number;
 };
 
+export type ReorderItem = {
+  productId: string;
+  quantity: number;
+  note: string;
+  modifiers: { group: string; option: string }[];
+};
+
+export type PickupConfig = { enabled: boolean; openTime: string; closeTime: string; leadMinutes: number; timeZone: string };
+export type MenuCustomer = { name: string; image: string | null; phone: string | null };
+
+/** Cocokkan item pesanan lama dengan menu saat ini (harga & stok terbaru) */
+function buildReorderLines(items: ReorderItem[], categories: MenuCategory[]) {
+  const products = new Map(categories.flatMap((c) => c.products.map((p) => [p.id, p] as const)));
+  const lines = [];
+  let skipped = 0;
+  for (const it of items) {
+    const p = products.get(it.productId);
+    if (!p || p.soldOut) {
+      skipped++;
+      continue;
+    }
+    const optionIds: string[] = [];
+    const modifiers: { group: string; option: string; priceDelta: number }[] = [];
+    let ok = true;
+    for (const g of p.groups) {
+      const picked = it.modifiers
+        .filter((m) => m.group === g.name)
+        .map((m) => g.options.find((o) => o.name === m.option && o.isAvailable))
+        .filter((o): o is NonNullable<typeof o> => Boolean(o));
+      if (picked.length < g.minSelect || picked.length > g.maxSelect) ok = false;
+      picked.forEach((o) => {
+        optionIds.push(o.id);
+        modifiers.push({ group: g.name, option: o.name, priceDelta: o.priceDelta });
+      });
+    }
+    if (!ok) {
+      skipped++;
+      continue;
+    }
+    lines.push({
+      key: lineKey(p.id, optionIds, it.note),
+      productId: p.id,
+      name: p.name,
+      unitPrice: p.price + modifiers.reduce((s, m) => s + m.priceDelta, 0),
+      quantity: Math.min(99, it.quantity),
+      optionIds,
+      modifiers,
+      note: it.note,
+      imageUrl: p.imageUrl,
+      emoji: p.emoji,
+    });
+  }
+  return { lines, skipped };
+}
+
 export function MenuApp({
   outlet,
   table,
   categories,
+  customer = null,
+  googleEnabled = false,
+  reorder = null,
+  pickup = null,
 }: {
   outlet: MenuOutlet;
   table: { name: string; area: string | null; token: string } | null;
   categories: MenuCategory[];
+  customer?: MenuCustomer | null;
+  googleEnabled?: boolean;
+  reorder?: ReorderItem[] | null;
+  pickup?: PickupConfig | null;
 }) {
   const cart = useCart(`cart:${outlet.id}:${table?.token ?? "takeaway"}`);
   const [query, setQuery] = useState("");
@@ -42,10 +105,26 @@ export function MenuApp({
   const [orders, setOrders] = useState<RememberedOrder[]>([]);
   const [ordersOpen, setOrdersOpen] = useState(false);
   const router = useRouter();
+  const pathname = usePathname();
   const [bump, setBump] = useState(0);
   const navRef = useRef<HTMLDivElement>(null);
+  const reorderDone = useRef(false);
 
   useEffect(() => setOrders(recentOrders(outlet.id)), [outlet.id]);
+
+  // "Pesan lagi" dari riwayat akun: isi keranjang lalu buka
+  useEffect(() => {
+    if (!reorder || !cart.hydrated || reorderDone.current) return;
+    reorderDone.current = true;
+    const { lines, skipped } = buildReorderLines(reorder, categories);
+    lines.forEach((l) => cart.add(l));
+    if (lines.length) {
+      toast.success(`${lines.length} menu dari pesanan sebelumnya masuk keranjang`);
+      setCartOpen(true);
+    }
+    if (skipped) toast.warning(`${skipped} menu sudah tidak tersedia atau berubah pilihannya`);
+    router.replace(pathname, { scroll: false });
+  }, [reorder, cart, categories, router, pathname]);
 
   const featured = useMemo(
     () =>
@@ -131,14 +210,34 @@ export function MenuApp({
               <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.2em] text-cream/65">{BRAND.tagline}</p>
             </div>
           </div>
-          {orders.length > 0 && (
-            <button
-              onClick={() => (orders.length === 1 ? router.push(`/order/${orders[0].id}`) : setOrdersOpen(true))}
-              className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-3.5 text-xs font-semibold transition hover:bg-cream/25"
-            >
-              <Receipt className="size-4" /> Pesanan{orders.length > 1 ? ` (${orders.length})` : ""}
-            </button>
-          )}
+          <div className="flex shrink-0 items-center gap-2">
+            {orders.length > 0 && (
+              <button
+                onClick={() => (orders.length === 1 ? router.push(`/order/${orders[0].id}`) : setOrdersOpen(true))}
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-3.5 text-xs font-semibold transition hover:bg-cream/25"
+              >
+                <Receipt className="size-4" /> Pesanan{orders.length > 1 ? ` (${orders.length})` : ""}
+              </button>
+            )}
+            {(customer || googleEnabled) && (
+              <Link
+                href={`/akun?next=${encodeURIComponent(pathname)}`}
+                aria-label={customer ? "Akun saya" : "Masuk"}
+                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-1 text-xs font-semibold transition hover:bg-cream/25"
+              >
+                {customer ? (
+                  customer.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={customer.image} alt="" referrerPolicy="no-referrer" className="size-8 rounded-full object-cover" />
+                  ) : (
+                    <span className="grid size-8 place-items-center rounded-full bg-cream text-[11px] font-bold text-olive-deep">{initials(customer.name)}</span>
+                  )
+                ) : (
+                  <span className="flex items-center gap-1.5 px-2.5"><UserRound className="size-4" /> Masuk</span>
+                )}
+              </Link>
+            )}
+          </div>
         </div>
       </header>
 
@@ -418,6 +517,9 @@ export function MenuApp({
         cart={cart}
         outlet={outlet}
         table={table}
+        customer={customer}
+        googleEnabled={googleEnabled}
+        pickup={table ? null : pickup}
       />
     </div>
   );

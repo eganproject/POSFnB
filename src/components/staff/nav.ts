@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import {
-  BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone,
+  BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone, Settings,
 } from "lucide-react";
 
 export const SIDEBAR_COOKIE = "sidebar_collapsed";
@@ -16,6 +16,7 @@ export const NAV = [
   { href: "/dashboard/tables", label: "Meja & QR", icon: QrCode, roles: ["OWNER", "KASIR", "PELAYAN"] as Role[], group: "Kelola" },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/outlets", label: "Outlet", icon: Store, roles: ["OWNER"] as Role[], group: "Kelola" },
+  { href: "/dashboard/settings", label: "Pengaturan", icon: Settings, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/users", label: "Pengguna", icon: Users, roles: ["OWNER"] as Role[], group: "Kelola" },
 ];
 

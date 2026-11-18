@@ -25,6 +25,8 @@ export type CreateOrderInput = {
   payPreference?: PaymentMethod | null;
   cashierId?: string | null;
   discount?: number;
+  customerId?: string | null;
+  pickupAt?: Date | null;
 };
 
 export async function createOrder(input: CreateOrderInput) {
@@ -66,6 +68,8 @@ export async function createOrder(input: CreateOrderInput) {
             customerPhone: input.customerPhone?.trim() || null,
             note: input.note?.trim() || null,
             cashierId: input.cashierId ?? null,
+            customerId: input.customerId ?? null,
+            pickupAt: input.type === "TAKEAWAY" ? input.pickupAt ?? null : null,
             ...totals,
             items: {
               create: lines.map((l) => ({
@@ -257,7 +261,7 @@ export async function createGatewayPayment(opts: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   let snapToken = `demo-${randomCode(10)}`;
   let redirectUrl: string | null = null;
-  if (isMidtransEnabled()) {
+  if (await isMidtransEnabled()) {
     const snap = await createSnapTransaction({
       orderId: gatewayOrderId,
       amount,

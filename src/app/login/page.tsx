@@ -1,7 +1,9 @@
 import { redirect } from "next/navigation";
-import { getCurrentUser } from "@/lib/session";
+import Link from "next/link";
+import { getSessionUser } from "@/lib/session";
 import { ROLE_HOME } from "@/lib/constants";
-import { googleAuthEnabled } from "@/lib/auth";
+import { isGoogleLoginEnabled } from "@/lib/auth";
+import { SignOutButton } from "@/components/customer/sign-out-button";
 import { BRAND, BRAND_PHOTOS } from "@/lib/brand";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { LoginForm } from "./login-form";
@@ -17,8 +19,9 @@ const GOOGLE_ERRORS: Record<string, string> = {
 export const metadata = { title: "Masuk" };
 
 export default async function LoginPage({ searchParams }: { searchParams: Promise<{ next?: string; error?: string }> }) {
-  const user = await getCurrentUser();
-  if (user) redirect(ROLE_HOME[user.role]);
+  const user = await getSessionUser();
+  if (user && user.role !== "CUSTOMER") redirect(ROLE_HOME[user.role]);
+  const googleAuthEnabled = await isGoogleLoginEnabled();
   const { next, error } = await searchParams;
   const errorMessage = error ? (GOOGLE_ERRORS[error] ?? "Gagal masuk dengan Google. Silakan coba lagi.") : undefined;
   return (
@@ -61,6 +64,18 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
                 ? "Gunakan email & password dari owner, atau akun Google dengan email yang sudah didaftarkan."
                 : "Gunakan email & password yang diberikan owner."}</p>
           </div>
+          {user?.role === "CUSTOMER" && (
+            <div role="alert" className="space-y-3 rounded-xl border border-honey/40 bg-honey/10 px-4 py-3 text-sm">
+              <p>
+                Anda masuk sebagai <b>pelanggan</b> ({user.email}). Akun ini bukan akun staf. Minta owner mendaftarkan email ini
+                sebagai staf, atau keluar lalu masuk dengan akun staf.
+              </p>
+              <div className="flex flex-wrap gap-2">
+                <Link href="/akun" className="rounded-full border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted">Ke akun pelanggan</Link>
+                <SignOutButton className="rounded-full border bg-card px-3 py-1.5 text-xs font-semibold hover:bg-muted" redirectTo="/login" />
+              </div>
+            </div>
+          )}
           {errorMessage && (
             <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
               {errorMessage}

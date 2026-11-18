@@ -25,6 +25,7 @@ Dibangun dengan Next.js 15 (App Router) + TypeScript, Prisma + PostgreSQL, Bette
 | `KASIR` | POS, pembayaran, shift, pesanan, layar dapur, stok |
 | `DAPUR` | Layar dapur & stok habis |
 | `PELAYAN` | Pesanan, POS (open bill tanpa terima bayar), meja |
+| `CUSTOMER` | Pelanggan (login Google): akun, riwayat pesanan & kunjungan, pesan lagi. Tidak bisa membuka area staf |
 
 ---
 
@@ -96,44 +97,52 @@ Tanpa key, aplikasi berjalan dalam **mode demo**: tombol bayar membuka dialog si
 
 Untuk memakai Midtrans Sandbox sungguhan:
 1. Daftar di <https://dashboard.sandbox.midtrans.com> (gratis).
-2. **Settings → Access Keys**, salin **Server Key** dan **Client Key** ke `.env`:
-   ```env
-   MIDTRANS_SERVER_KEY="SB-Mid-server-xxxx"
-   NEXT_PUBLIC_MIDTRANS_CLIENT_KEY="SB-Mid-client-xxxx"
-   ```
-3. Restart server. Popup Snap akan muncul saat customer/kasir menekan bayar. Gunakan [simulator pembayaran sandbox](https://simulator.sandbox.midtrans.com) untuk “membayar” QRIS/VA.
+2. **Settings → Access Keys**, salin **Server Key** dan **Client Key**.
+3. Login sebagai owner → **Dashboard → Kelola → Pengaturan** → isi key → **Simpan** → **Uji koneksi**. Langsung aktif tanpa restart.
+   Server Key disimpan terenkripsi (AES-256-GCM, kunci dari `BETTER_AUTH_SECRET`) dan hanya ditampilkan sebagian.
+   Alternatif lama tetap jalan: isi `MIDTRANS_SERVER_KEY` & `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` di `.env` (dipakai bila Pengaturan kosong).
+4. Gunakan [simulator pembayaran sandbox](https://simulator.sandbox.midtrans.com) untuk “membayar” QRIS/VA.
 
 **Status pembayaran di localhost:** webhook Midtrans tidak bisa menjangkau `localhost`, jadi aplikasi otomatis **mengecek status transaksi ke API Midtrans** setiap beberapa detik selama ada pembayaran tertunda. Tidak perlu setup tambahan.
 
-Jika nanti punya URL publik, isi **Payment Notification URL** di dashboard Midtrans dengan `https://<domain>/api/midtrans/notification` (signature diverifikasi dengan SHA-512).
+Jika punya URL publik, isi **Payment Notification URL** di dashboard Midtrans dengan URL yang tertera di halaman Pengaturan (`https://<domain>/api/midtrans/notification`, signature diverifikasi dengan SHA-512).
+
+> ⚠️ Jangan ganti `BETTER_AUTH_SECRET` setelah key disimpan di Pengaturan. Jika terganti, halaman Pengaturan akan meminta key diisi ulang.
 
 ---
 
 ## 🔐 Login dengan Google (opsional, gratis)
 
-Selain email + password, staf bisa masuk dengan tombol **Masuk dengan Google**. Login ini memakai Better Auth (data user tetap di database Santap POS), bukan Firebase.
+Login memakai Better Auth (akun & sesi tersimpan di database Santap POS sendiri), bukan Firebase.
 
-**Aturan akses:** hanya email yang **sudah didaftarkan owner** di menu Pengguna yang bisa masuk. Peran (owner/kasir/dapur/pelayan) mengikuti data yang dibuat owner. Akun Google yang belum terdaftar ditolak dan tidak dibuatkan akun baru, jadi orang asing tidak pernah mendapat akses. Akun yang dinonaktifkan owner juga tidak bisa masuk lewat Google.
+**Pelanggan:** siapa pun bisa masuk/daftar dengan Google dari menu (tombol **Masuk**) atau `/akun`. Akun baru **selalu** berperan *Pelanggan*: tidak bisa membuka dashboard, POS, atau dapur. Pelanggan yang login mendapat riwayat kunjungan & pesanan, tombol **Pesan lagi**, dan isi otomatis nama/WA. Login tidak wajib: pesan lewat QR meja tetap bisa tanpa akun.
 
-Tanpa `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`, tombol Google disembunyikan.
+**Staf:** email yang didaftarkan owner di menu Pengguna otomatis tertaut ke akun Google dengan email sama, dan peran mengikuti data owner. Akun Google yang bukan staf hanya menjadi pelanggan. Jika owner kemudian mendaftarkan email pelanggan sebagai staf, akun tersebut dinaikkan menjadi staf (riwayat pesanannya tetap).
+
+Tombol Google disembunyikan selama Client ID/Secret belum diisi.
 
 ### Membuat OAuth Client di Google Cloud Console
 1. Buka <https://console.cloud.google.com>, buat project baru (mis. `santap-pos`).
-2. **APIs & Services → OAuth consent screen** (di konsol baru bernama **Google Auth Platform**):
-   - User type **External**, isi nama aplikasi & email dukungan.
-   - Selama status **Testing**, tambahkan email staf yang akan login di bagian **Test users** (maks. 100 user, gratis).
-3. **APIs & Services → Credentials → Create Credentials → OAuth client ID**:
-   - Application type: **Web application**
-   - **Authorized JavaScript origins:** `http://localhost:3000`
-   - **Authorized redirect URIs:** `http://localhost:3000/api/auth/callback/google`
-4. Salin **Client ID** dan **Client secret** ke `.env`:
-   ```env
-   GOOGLE_CLIENT_ID="xxxx.apps.googleusercontent.com"
-   GOOGLE_CLIENT_SECRET="GOCSPX-xxxx"
-   ```
-5. Pastikan `BETTER_AUTH_URL="http://localhost:3000"`, lalu restart `pnpm dev`.
+2. **Google Auth Platform → Branding / OAuth consent screen**: user type **External**, isi nama aplikasi, email dukungan, dan domain (mis. `paketpas.tech`).
+3. **Audience**: klik **Publish app** (status *In production*) agar semua pelanggan bisa login. Scope yang dipakai hanya email & profil dasar, jadi tidak perlu verifikasi Google. Selama masih *Testing*, hanya email di daftar *Test users* yang bisa login.
+4. **Clients → Create client → Web application**, isi persis seperti yang tertera di halaman **Pengaturan**:
+   - **Authorized JavaScript origins:** `https://pos.paketpas.tech` (lokal: `http://localhost:3000`)
+   - **Authorized redirect URIs:** `https://pos.paketpas.tech/api/auth/callback/google` (lokal: `http://localhost:3000/api/auth/callback/google`)
+5. Salin **Client ID** dan **Client secret** ke **Dashboard → Pengaturan → Login Google** lalu Simpan. Langsung aktif tanpa restart.
+   (Alternatif: `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` di `.env`.)
+6. Pastikan `BETTER_AUTH_URL` di `.env` sama dengan domain di atas (mis. `https://pos.paketpas.tech`).
 
-**Catatan:** Google hanya menerima redirect ke `localhost` atau domain HTTPS, bukan IP LAN seperti `http://192.168.x.x:3000`. Jadi saat development, login Google dipakai dari browser di PC yang menjalankan aplikasi (`http://localhost:3000/login`). Di HP lewat IP LAN, staf tetap bisa masuk dengan email + password. Menu QR untuk customer tidak memerlukan login.
+**Catatan:** Google hanya menerima redirect ke `localhost` atau domain HTTPS, bukan IP LAN seperti `http://192.168.x.x:3000`.
+
+---
+
+## 🛍️ Takeaway dari aplikasi
+
+Link takeaway tiap outlet: `/m/<slug>` (juga ada QR-nya di menu Meja & QR, dan tombol **Pesan takeaway** di halaman depan).
+
+- Pelanggan memilih **Secepatnya** (bisa bayar online atau di kasir) atau **Pilih jam** ambil (slot 15 menit, wajib bayar online via Midtrans).
+- Jam buka, jam tutup, waktu siap minimal, dan on/off takeaway diatur per outlet di **Dashboard → Outlet**. Jam tutup lebih kecil dari jam buka berarti tutup lewat tengah malam.
+- Jam ambil tampil di papan pesanan, layar dapur, halaman pantau pesanan, dan riwayat akun.
 
 ---
 

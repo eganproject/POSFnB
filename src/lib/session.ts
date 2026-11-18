@@ -3,22 +3,40 @@ import { cache } from "react";
 import { headers, cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import type { Role } from "@prisma/client";
-import { auth } from "./auth";
+import { getAuth } from "./auth";
 import { db } from "./db";
 import { ROLE_HOME } from "./constants";
 
 export const OUTLET_COOKIE = "pos_outlet";
 
-export const getCurrentUser = cache(async () => {
+/** User yang sedang login (staf maupun pelanggan) */
+export const getSessionUser = cache(async () => {
+  const auth = await getAuth();
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session) return null;
   const user = await db.user.findUnique({
     where: { id: session.user.id },
-    select: { id: true, name: true, email: true, role: true, outletId: true, isActive: true },
+    select: { id: true, name: true, email: true, image: true, phone: true, role: true, outletId: true, isActive: true },
   });
   if (!user || !user.isActive) return null;
   return user;
 });
+
+/** Staf yang sedang login. Pelanggan (CUSTOMER) dianggap belum login di area staf. */
+export const getCurrentUser = cache(async () => {
+  const user = await getSessionUser();
+  if (!user || user.role === "CUSTOMER") return null;
+  return { id: user.id, name: user.name, email: user.email, role: user.role, outletId: user.outletId, isActive: user.isActive };
+});
+
+/** Pelanggan yang sedang login (untuk riwayat pesanan) */
+export const getCurrentCustomer = cache(async () => {
+  const user = await getSessionUser();
+  if (!user || user.role !== "CUSTOMER") return null;
+  return { id: user.id, name: user.name, email: user.email, image: user.image, phone: user.phone };
+});
+
+export type CurrentCustomer = NonNullable<Awaited<ReturnType<typeof getCurrentCustomer>>>;
 
 export type CurrentUser = NonNullable<Awaited<ReturnType<typeof getCurrentUser>>>;
 

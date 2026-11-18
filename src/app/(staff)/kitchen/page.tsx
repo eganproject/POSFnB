@@ -1,4 +1,5 @@
 import { db } from "@/lib/db";
+import { pickupLabel } from "@/lib/pickup-label";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { KitchenBoard } from "./kitchen-board";
 
@@ -30,6 +31,7 @@ export default async function KitchenPage() {
         type: o.type,
         source: o.source,
         tableName: o.table?.name ?? null,
+        pickupLabel: pickupLabel(o.pickupAt),
         customerName: o.customerName,
         note: o.note,
         since: (o.confirmedAt ?? o.createdAt).toISOString(),

@@ -12,11 +12,11 @@ describe("midtrans", () => {
     expect(mapMidtransState({ transaction_status: "pending" })).toBe("PENDING");
   });
   it("memverifikasi signature SHA-512", () => {
-    process.env.MIDTRANS_SERVER_KEY = "SB-test";
     const n = { order_id: "A-1", status_code: "200", gross_amount: "41580.00", transaction_status: "settlement" };
     const signature_key = crypto.createHash("sha512").update(`A-1200${"41580.00"}SB-test`).digest("hex");
-    expect(verifySignature({ ...n, signature_key })).toBe(true);
-    expect(verifySignature({ ...n, signature_key: "palsu" })).toBe(false);
-    expect(verifySignature({ ...n })).toBe(false);
+    expect(verifySignature({ ...n, signature_key }, "SB-test")).toBe(true);
+    expect(verifySignature({ ...n, signature_key: "palsu" }, "SB-test")).toBe(false);
+    expect(verifySignature({ ...n }, "SB-test")).toBe(false);
+    expect(verifySignature({ ...n, signature_key }, "")).toBe(false);
   });
 });
