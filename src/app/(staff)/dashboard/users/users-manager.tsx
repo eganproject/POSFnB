@@ -120,7 +120,7 @@ export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { 
                 <TR key={u.id} className={cn("group", !u.isActive && "opacity-55")}>
                   <TD>
                     <div className="flex items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-amber-500 text-xs font-bold text-white">{initials(u.name)}</span>
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-olive text-xs font-bold text-white">{initials(u.name)}</span>
                       <div className="min-w-0">
                         <p className="truncate font-medium">
                           {u.name} {u.id === meId && <span className="ml-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">Anda</span>}

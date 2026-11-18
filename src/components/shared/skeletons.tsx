@@ -23,7 +23,7 @@ export function DashboardSkeleton() {
 export function MenuSkeleton() {
   return (
     <div className="mx-auto min-h-dvh max-w-xl">
-      <div className="h-40 animate-pulse bg-gradient-to-br from-primary/50 to-amber-400/40" />
+      <div className="h-40 animate-pulse bg-olive/60" />
       <div className="-mt-10 space-y-4 px-4">
         <Skeleton className="h-20 rounded-2xl border bg-card" />
         <Skeleton className="h-11 rounded-full" />

@@ -1,9 +1,11 @@
 "use client";
+import { BRAND } from "@/lib/brand";
+import { BrandMark } from "@/components/shared/brand-mark";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useTransition } from "react";
 import type { Role } from "@prisma/client";
-import { Check, ChevronsUpDown, LogOut, Store, UtensilsCrossed } from "lucide-react";
+import { Check, ChevronsUpDown, LogOut, Store } from "lucide-react";
 import { cn, initials } from "@/lib/utils";
 import { ROLE_LABEL } from "@/lib/constants";
 import { authClient } from "@/lib/auth-client";
@@ -26,10 +28,10 @@ export function signOut() {
 export function Logo({ collapsed }: { collapsed?: boolean }) {
   return (
     <Link href="/" className="flex items-center gap-2.5 px-1 text-lg font-bold tracking-tight">
-      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-primary to-amber-500 text-white shadow-lg shadow-primary/30">
-        <UtensilsCrossed className="size-[18px]" />
+      <span className="grid size-9 shrink-0 place-items-center rounded-xl bg-cream text-olive-deep">
+        <BrandMark className="size-6" />
       </span>
-      <span className={cn("whitespace-nowrap transition-opacity duration-200", collapsed && "pointer-events-none opacity-0")}>Santap POS</span>
+      <span className={cn("whitespace-nowrap transition-opacity duration-200", collapsed && "pointer-events-none opacity-0")}>{BRAND.shortName}</span>
     </Link>
   );
 }
@@ -84,7 +86,7 @@ export function UserMenu({ user, collapsed }: { user: ShellProps["user"]; collap
         title={collapsed ? user.name : undefined}
         className="flex w-full items-center gap-3 rounded-xl p-2 text-left outline-none transition hover:bg-white/5 focus-visible:ring-2 focus-visible:ring-primary/50"
       >
-        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-amber-500 text-sm font-bold text-white ring-2 ring-white/10">
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-cream text-sm font-bold text-olive-deep ring-2 ring-white/10">
           {initials(user.name)}
         </span>
         {!collapsed && (
