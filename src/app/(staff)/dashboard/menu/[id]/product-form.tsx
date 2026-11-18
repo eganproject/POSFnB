@@ -25,6 +25,7 @@ type FormState = {
   emoji: string;
   isActive: boolean;
   isFeatured: boolean;
+  quickReady: boolean;
   groups: Group[];
 };
 
@@ -80,6 +81,7 @@ export function ProductForm({ categories, initial }: { categories: { id: string;
       emoji: f.emoji || null,
       isActive: f.isActive,
       isFeatured: f.isFeatured,
+      quickReady: f.quickReady,
       groups: f.groups.map((g) => ({
         id: g.id,
         name: g.name,
@@ -159,6 +161,10 @@ export function ProductForm({ categories, initial }: { categories: { id: string;
               <label className="flex items-center justify-between rounded-xl border p-3 text-sm">
                 <span><b className="block">Favorit ⭐</b><span className="text-xs text-muted-foreground">Ditonjolkan di bagian atas</span></span>
                 <Switch checked={f.isFeatured} onCheckedChange={(v) => set("isFeatured", v)} />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
+                <span><b className="block">Langsung siap ⚡</b><span className="text-xs text-muted-foreground">Di layar dapur sekali ketuk langsung Siap, tanpa tahap Disiapkan. Cocok untuk minuman botol atau kue display.</span></span>
+                <Switch checked={f.quickReady} onCheckedChange={(v) => set("quickReady", v)} />
               </label>
             </CardContent>
           </Card>

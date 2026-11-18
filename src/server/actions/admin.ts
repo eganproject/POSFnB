@@ -216,6 +216,7 @@ const productSchema = z.object({
   emoji: z.string().trim().max(8).optional().nullable(),
   isActive: z.boolean(),
   isFeatured: z.boolean(),
+  quickReady: z.boolean().default(false),
   groups: z.array(groupSchema).max(10),
 });
 

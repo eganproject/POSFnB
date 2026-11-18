@@ -3,14 +3,14 @@ import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import type { OrderItemStatus, OrderSource, OrderType, Role } from "@prisma/client";
-import { ArrowLeft, Check, CheckCheck, ChefHat, Flame, HandPlatter, Maximize, PackageX, Play, Undo2, Volume2, VolumeX } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, ChefHat, Flame, HandPlatter, Maximize, PackageX, Play, Undo2, Volume2, VolumeX, Zap } from "lucide-react";
 import { toast } from "sonner";
 import { cn, pad } from "@/lib/utils";
 import { useRealtime } from "@/hooks/use-realtime";
 import { chime } from "@/components/staff/live-alerts";
 import { Button } from "@/components/ui/button";
 import { updateItemStatus, updateOrderStatus } from "@/server/actions/staff";
-import { itemProgress, itemStatusLabel } from "@/lib/order-flow";
+import { itemProgress, itemStatusLabel, nextItemStep, prevItemStep } from "@/lib/order-flow";
 
 type KOrder = {
   id: string;
@@ -25,7 +25,7 @@ type KOrder = {
   note: string | null;
   since: string;
   readyAt: string | null;
-  items: { id: string; name: string; quantity: number; note: string | null; status: OrderItemStatus; modifiers: string[] }[];
+  items: { id: string; name: string; quantity: number; note: string | null; status: OrderItemStatus; quickReady: boolean; modifiers: string[] }[];
 };
 
 const COLUMNS = [
@@ -86,6 +86,9 @@ export function KitchenBoard({ outletName, orders, role }: { outletName: string;
           <p className="font-bold">Layar Dapur</p>
           <p className="text-xs text-muted-foreground">{outletName}</p>
         </div>
+        <p className="ml-4 hidden text-xs text-muted-foreground lg:block">
+          Ketuk item untuk lanjut ke tahap berikutnya · tekan lama untuk koreksi
+        </p>
         <div className="ml-auto flex items-center gap-2">
           <Button asChild variant="secondary" size="sm">
             <Link href="/dashboard/stock">
@@ -145,9 +148,6 @@ export function KitchenBoard({ outletName, orders, role }: { outletName: string;
   );
 }
 
-/** Mundur satu langkah (koreksi salah tekan) */
-const BACK: Partial<Record<OrderItemStatus, OrderItemStatus>> = { PREPARING: "QUEUED", READY: "PREPARING", SERVED: "READY" };
-
 const ITEM_TONE: Record<OrderItemStatus, string> = {
   QUEUED: "bg-sky-500/15 text-sky-300",
   PREPARING: "bg-primary/20 text-primary",
@@ -155,9 +155,20 @@ const ITEM_TONE: Record<OrderItemStatus, string> = {
   SERVED: "bg-muted text-muted-foreground",
 };
 
+/** Tampilan tombol "langkah berikutnya" di sisi kanan baris item */
+const NEXT_UI: Record<OrderItemStatus, { label: (t: OrderType) => string; icon: typeof Check; cls: string }> = {
+  QUEUED: { label: () => "Mulai", icon: Play, cls: "bg-primary text-primary-foreground" },
+  PREPARING: { label: () => "Siap", icon: HandPlatter, cls: "bg-success text-white" },
+  READY: { label: (t) => (t === "TAKEAWAY" ? "Diambil" : "Diantar"), icon: Check, cls: "border-2 border-emerald-500/60 text-emerald-300" },
+  SERVED: { label: () => "", icon: Check, cls: "" },
+};
+
+const LONG_PRESS_MS = 550;
+
 function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
+  const [fixing, setFixing] = useState<string | null>(null);
   const minutes = Math.max(0, Math.floor((now - new Date(o.since).getTime()) / 60000));
   const urgency = o.status === "READY" ? "ok" : minutes >= 20 ? "late" : minutes >= 10 ? "warn" : "ok";
   const p = itemProgress(o.items);
@@ -169,10 +180,17 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
       router.refresh();
     });
 
-  const setItem = (id: string, expected: OrderItemStatus, to: OrderItemStatus) =>
+  const setItem = (item: KOrder["items"][number], from: OrderItemStatus, to: OrderItemStatus, { undoable = true } = {}) =>
     start(async () => {
-      const r = await updateItemStatus({ orderId: o.id, itemIds: [id], expected, to });
+      const r = await updateItemStatus({ orderId: o.id, itemIds: [item.id], expected: from, to });
       if (!r.ok) toast.error(r.error);
+      else if (undoable) {
+        toast.success(`#${pad(o.queueNumber)} · ${item.name}: ${itemStatusLabel(to, o.type)}`, {
+          duration: 5000,
+          action: { label: "Urungkan", onClick: () => setItem(item, to, from, { undoable: false }) },
+        });
+      }
+      setFixing(null);
       router.refresh();
     });
 
@@ -206,93 +224,142 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
           </span>
         </div>
       )}
-      <ul className="divide-y divide-border/60">
-        {o.items.map((i) => {
-          const back = BACK[i.status];
-          return (
-            <li key={i.id} className={cn("flex items-start gap-3 px-4 py-2.5", i.status === "SERVED" && "opacity-45")}>
-              <div className="min-w-0 flex-1">
-                <p className={cn("font-semibold", i.status === "SERVED" && "line-through")}>
-                  <span className="mr-1.5 text-primary">{i.quantity}×</span>
-                  {i.name}
-                </p>
-                {i.modifiers.length > 0 && <p className="text-sm text-muted-foreground">{i.modifiers.join(" · ")}</p>}
-                {i.note && <p className="mt-0.5 rounded-md bg-warning/20 px-2 py-0.5 text-sm font-medium text-warning">⚠ {i.note}</p>}
-                <span className={cn("mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold", ITEM_TONE[i.status])}>
-                  {itemStatusLabel(i.status, o.type)}
-                </span>
-              </div>
-              <div className="flex shrink-0 items-center gap-1.5">
-                {back && (
-                  <button
-                    onClick={() => setItem(i.id, i.status, back)}
-                    aria-label={`Kembalikan ${i.name} ke ${itemStatusLabel(back, o.type)}`}
-                    title={`Kembalikan ke ${itemStatusLabel(back, o.type)}`}
-                    className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-muted"
-                  >
-                    <Undo2 className="size-4" />
-                  </button>
-                )}
-                {i.status === "QUEUED" && (
-                  <>
-                    <button
-                      onClick={() => setItem(i.id, "QUEUED", "READY")}
-                      aria-label={`${i.name} langsung siap`}
-                      title="Langsung siap"
-                      className="grid size-9 place-items-center rounded-lg bg-muted text-emerald-400 hover:bg-muted/70"
-                    >
-                      <Check className="size-4" />
-                    </button>
-                    <Button size="sm" className="h-9" onClick={() => setItem(i.id, "QUEUED", "PREPARING")}>
-                      <Play /> Mulai
-                    </Button>
-                  </>
-                )}
-                {i.status === "PREPARING" && (
-                  <Button size="sm" variant="success" className="h-9" onClick={() => setItem(i.id, "PREPARING", "READY")}>
-                    <HandPlatter /> Siap
-                  </Button>
-                )}
-                {i.status === "READY" && (
-                  <Button size="sm" variant="outline" className="h-9" onClick={() => setItem(i.id, "READY", "SERVED")}>
-                    <Check /> {o.type === "TAKEAWAY" ? "Diambil" : "Diantar"}
-                  </Button>
-                )}
-              </div>
-            </li>
-          );
-        })}
+      <ul className="space-y-1.5 p-2">
+        {o.items.map((i) => (
+          <ItemRow
+            key={i.id}
+            item={i}
+            type={o.type}
+            fixing={fixing === i.id}
+            onAdvance={() => {
+              const next = nextItemStep(i.status, i.quickReady);
+              if (next) setItem(i, i.status, next);
+              else toast.info("Sudah diantar. Tekan lama untuk koreksi.");
+            }}
+            onLongPress={() => (prevItemStep(i.status, i.quickReady) ? setFixing(i.id) : toast.info("Item masih antre, tidak ada yang perlu dikoreksi."))}
+            onUndo={() => {
+              const back = prevItemStep(i.status, i.quickReady);
+              if (back) setItem(i, i.status, back, { undoable: false });
+            }}
+            onCloseFix={() => setFixing(null)}
+          />
+        ))}
       </ul>
       {o.note && <p className="mx-4 mb-2 rounded-lg bg-warning/15 px-3 py-2 text-sm text-warning">📝 {o.note}</p>}
-      <div className="flex gap-2 p-3">
+      <div className="flex gap-2 p-3 pt-1">
         {o.status === "CONFIRMED" && (
           <Button className="flex-1" size="lg" onClick={() => move("PREPARING")}>
             <ChefHat /> {p.total > 1 ? "Mulai semua" : "Mulai masak"}
           </Button>
         )}
         {o.status === "PREPARING" && (
-          <>
-            {p.done === 0 && (
-              <Button variant="secondary" size="icon" className="h-12 w-12" onClick={() => move("CONFIRMED")} aria-label="Kembalikan ke antrean">
-                <Undo2 />
-              </Button>
-            )}
-            <Button variant="success" className="flex-1" size="lg" onClick={() => move("READY")}>
-              <CheckCheck /> {p.total > 1 ? "Semua siap" : "Tandai siap"}
-            </Button>
-          </>
+          <Button variant="success" className="flex-1" size="lg" onClick={() => move("READY")}>
+            <CheckCheck /> {p.total > 1 ? "Semua siap" : "Tandai siap"}
+          </Button>
         )}
         {o.status === "READY" && (
-          <>
-            <Button variant="secondary" size="icon" className="h-12 w-12" onClick={() => move("PREPARING")} aria-label="Kembalikan">
-              <Undo2 />
-            </Button>
-            <Button variant="outline" className="flex-1" size="lg" onClick={() => move("COMPLETED")}>
-              <CheckCheck /> {p.toServe > 1 ? "Semua sudah diantar" : "Sudah diantar"}
-            </Button>
-          </>
+          <Button variant="outline" className="flex-1" size="lg" onClick={() => move("COMPLETED")}>
+            <CheckCheck /> {p.toServe > 1 ? "Semua sudah diantar" : "Sudah diantar"}
+          </Button>
         )}
       </div>
     </article>
+  );
+}
+
+/** Satu baris item: ketuk = maju satu tahap, tekan lama = koreksi */
+function ItemRow({
+  item: i,
+  type,
+  fixing,
+  onAdvance,
+  onLongPress,
+  onUndo,
+  onCloseFix,
+}: {
+  item: KOrder["items"][number];
+  type: OrderType;
+  fixing: boolean;
+  onAdvance: () => void;
+  onLongPress: () => void;
+  onUndo: () => void;
+  onCloseFix: () => void;
+}) {
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const longPressed = useRef(false);
+  const next = nextItemStep(i.status, i.quickReady);
+  const back = prevItemStep(i.status, i.quickReady);
+  const ui = next ? NEXT_UI[i.status] : null;
+  const nextLabel = next === "READY" && i.status === "QUEUED" ? "Siap" : ui?.label(type);
+  const NextIcon = next === "READY" && i.status === "QUEUED" ? Zap : ui?.icon;
+
+  const cancel = () => {
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = null;
+  };
+
+  if (fixing && back) {
+    return (
+      <li className="flex min-h-16 items-center gap-2 rounded-xl border-2 border-warning/60 bg-warning/10 px-3 py-2">
+        <p className="min-w-0 flex-1 text-sm">
+          Koreksi <b>{i.name}</b>
+        </p>
+        <Button variant="secondary" className="h-12" onClick={onUndo}>
+          <Undo2 /> Kembali ke {itemStatusLabel(back, type)}
+        </Button>
+        <Button variant="ghost" className="h-12" onClick={onCloseFix}>
+          Batal
+        </Button>
+      </li>
+    );
+  }
+
+  return (
+    <li>
+      <button
+        type="button"
+        onPointerDown={() => {
+          longPressed.current = false;
+          cancel();
+          timer.current = setTimeout(() => {
+            longPressed.current = true;
+            navigator.vibrate?.(30);
+            onLongPress();
+          }, LONG_PRESS_MS);
+        }}
+        onPointerUp={cancel}
+        onPointerLeave={cancel}
+        onPointerCancel={cancel}
+        onContextMenu={(e) => e.preventDefault()}
+        onClick={() => {
+          if (longPressed.current) return;
+          onAdvance();
+        }}
+        className={cn(
+          "flex min-h-16 w-full select-none items-center gap-3 rounded-xl px-3 py-2.5 text-left transition active:scale-[0.99]",
+          i.status === "SERVED" ? "opacity-45" : "bg-muted/40 hover:bg-muted/70",
+          i.status === "READY" && "bg-emerald-500/10 ring-1 ring-emerald-500/40"
+        )}
+      >
+        <div className="min-w-0 flex-1">
+          <p className={cn("text-[17px] font-semibold leading-snug", i.status === "SERVED" && "line-through")}>
+            <span className="mr-1.5 text-primary">{i.quantity}×</span>
+            {i.name}
+            {i.quickReady && i.status === "QUEUED" && <Zap className="ml-1.5 inline size-3.5 text-amber-400" aria-label="Langsung siap" />}
+          </p>
+          {i.modifiers.length > 0 && <p className="text-sm text-muted-foreground">{i.modifiers.join(" · ")}</p>}
+          {i.note && <p className="mt-0.5 rounded-md bg-warning/20 px-2 py-0.5 text-sm font-medium text-warning">⚠ {i.note}</p>}
+          <span className={cn("mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold", ITEM_TONE[i.status])}>
+            {itemStatusLabel(i.status, type)}
+          </span>
+        </div>
+        {ui && NextIcon && (
+          <span className={cn("flex h-12 min-w-24 shrink-0 items-center justify-center gap-1.5 rounded-xl px-3 text-sm font-bold", next === "READY" && i.status === "QUEUED" ? "bg-success text-white" : ui.cls)}>
+            <NextIcon className="size-4" /> {nextLabel}
+          </span>
+        )}
+        {!ui && <Check className="mr-3 size-5 shrink-0 text-muted-foreground" />}
+      </button>
+    </li>
   );
 }
