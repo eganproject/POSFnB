@@ -38,8 +38,14 @@ export function useSnap(clientKey: string, isProduction: boolean, enabled: boole
 
   const pay = useCallback((token: string, cb: SnapCallbacks) => {
     if (!window.snap) return false;
-    window.snap.pay(token, cb);
-    return true;
+    try {
+      window.snap.pay(token, cb);
+      return true;
+    } catch {
+      // Snap menolak bila popup sebelumnya masih terbuka
+      window.snap.hide?.();
+      return false;
+    }
   }, []);
   return { ready, pay };
 }

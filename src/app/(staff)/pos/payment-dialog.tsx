@@ -48,6 +48,9 @@ export function PaymentDialog({
   const [done, setDone] = useState<{ change: number } | null>(null);
   const [demoPaymentId, setDemoPaymentId] = useState<string | null>(null);
   const [pendingOnline, setPendingOnline] = useState<string | null>(null);
+  // Popup Snap dirender di luar dialog ini. Selama popup terbuka, dialog kasir
+  // disembunyikan supaya kunci klik/fokus/scroll milik dialog tidak menghalangi popup.
+  const [snapOpen, setSnapOpen] = useState(false);
   const snap = useSnap(config.clientKey, config.isProduction, !config.demo && !!orderId);
 
   const load = useCallback(async () => {
@@ -71,6 +74,7 @@ export function PaymentDialog({
     setCash(0);
     setReference("");
     setPendingOnline(null);
+    setSnapOpen(false);
     load();
   }, [orderId, load]);
 
@@ -116,11 +120,26 @@ export function PaymentDialog({
       if (mode === "items") toast.info("Split per item via online tidak menandai item. Gunakan bagi rata atau tunai/EDC untuk per item.");
       if (r.data.demo) return setDemoPaymentId(r.data.paymentId);
       setPendingOnline(r.data.paymentId);
+      setSnapOpen(true);
       const opened = snap.pay(r.data.token, {
-        onSuccess: () => afterPayment(0).then(() => setPendingOnline(null)),
-        onClose: () => {},
+        onSuccess: () => {
+          setSnapOpen(false);
+          afterPayment(0).then(() => setPendingOnline(null));
+        },
+        onPending: () => {
+          setSnapOpen(false);
+          toast.info("Menunggu customer menyelesaikan pembayaran");
+        },
+        onError: () => {
+          setSnapOpen(false);
+          toast.error("Pembayaran online gagal, coba lagi");
+        },
+        onClose: () => setSnapOpen(false),
       });
-      if (!opened && r.data.redirectUrl) window.open(r.data.redirectUrl, "_blank");
+      if (!opened) {
+        setSnapOpen(false);
+        if (r.data.redirectUrl) window.open(r.data.redirectUrl, "_blank");
+      }
       return;
     }
     const r = await payOrder({
@@ -143,7 +162,7 @@ export function PaymentDialog({
 
   return (
     <>
-      <Dialog open={!!orderId} onOpenChange={(o) => !o && onClose()}>
+      <Dialog open={!!orderId && !snapOpen} onOpenChange={(o) => !o && onClose()}>
         <DialogContent className="max-w-3xl gap-0 overflow-hidden p-0" aria-describedby={undefined}>
           {!order ? (
             <div className="space-y-3 p-6">
