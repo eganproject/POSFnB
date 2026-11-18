@@ -11,7 +11,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
   const { category } = await searchParams;
   const categories = await db.category.findMany({ orderBy: [{ sortOrder: "asc" }, { name: "asc" }], select: { id: true, name: true, icon: true } });
   if (id === "new") {
-    return <ProductForm categories={categories} initial={{ categoryId: category ?? categories[0]?.id ?? "", name: "", description: "", price: 0, imageUrl: "", emoji: "", isActive: true, isFeatured: false, groups: [] }} />;
+    return <ProductForm categories={categories} initial={{ categoryId: category ?? categories[0]?.id ?? "", name: "", description: "", price: 0, imageUrl: "", emoji: "", isActive: true, isFeatured: false, quickReady: false, groups: [] }} />;
   }
   const p = await db.product.findUnique({
     where: { id },
@@ -31,6 +31,7 @@ export default async function ProductPage({ params, searchParams }: { params: Pr
         emoji: p.emoji ?? "",
         isActive: p.isActive,
         isFeatured: p.isFeatured,
+        quickReady: p.quickReady,
         groups: p.modifierGroups.map((g) => ({
           id: g.id,
           key: g.id,

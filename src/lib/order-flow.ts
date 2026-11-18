@@ -16,11 +16,11 @@ import type { OrderItemStatus, OrderStatus, OrderType } from "@prisma/client";
 export const ITEM_STATUSES: OrderItemStatus[] = ["QUEUED", "PREPARING", "READY", "SERVED"];
 const RANK: Record<OrderItemStatus, number> = { QUEUED: 0, PREPARING: 1, READY: 2, SERVED: 3 };
 
-/** Transisi item yang sah (maju satu langkah, lompat Antre→Siap, atau mundur satu langkah untuk koreksi). */
+/** Transisi item yang sah (maju satu langkah, lompat Antre→Siap, mundur untuk koreksi; Siap→Antre untuk menu "langsung siap"). */
 export const ITEM_TRANSITIONS: Record<OrderItemStatus, OrderItemStatus[]> = {
   QUEUED: ["PREPARING", "READY"],
   PREPARING: ["READY", "QUEUED"],
-  READY: ["SERVED", "PREPARING"],
+  READY: ["SERVED", "PREPARING", "QUEUED"],
   SERVED: ["READY"],
 };
 
@@ -188,4 +188,35 @@ export const ITEM_STATUS_LABEL: Record<OrderItemStatus, string> = {
 export function itemStatusLabel(status: OrderItemStatus, type?: OrderType) {
   if (status === "SERVED" && type === "TAKEAWAY") return "Diambil";
   return ITEM_STATUS_LABEL[status];
+}
+
+/**
+ * Langkah berikutnya saat item diketuk di layar dapur.
+ * Menu "langsung siap" (quickReady) melewati tahap Disiapkan. Item yang sudah diantar tidak punya langkah lagi.
+ */
+export function nextItemStep(status: OrderItemStatus, quickReady = false): OrderItemStatus | null {
+  switch (status) {
+    case "QUEUED":
+      return quickReady ? "READY" : "PREPARING";
+    case "PREPARING":
+      return "READY";
+    case "READY":
+      return "SERVED";
+    case "SERVED":
+      return null;
+  }
+}
+
+/** Langkah mundur satu tahap untuk koreksi (kebalikan dari nextItemStep, menghormati quickReady) */
+export function prevItemStep(status: OrderItemStatus, quickReady = false): OrderItemStatus | null {
+  switch (status) {
+    case "QUEUED":
+      return null;
+    case "PREPARING":
+      return "QUEUED";
+    case "READY":
+      return quickReady ? "QUEUED" : "PREPARING";
+    case "SERVED":
+      return "READY";
+  }
 }

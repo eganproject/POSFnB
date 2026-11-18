@@ -3,6 +3,8 @@ import type { OrderItemStatus, OrderStatus } from "@prisma/client";
 import {
   FlowError,
   ITEM_STATUSES,
+  nextItemStep,
+  prevItemStep,
   ORDER_TRANSITIONS,
   assertItemChange,
   canItemTransition,
@@ -82,7 +84,6 @@ describe("transisi item", () => {
     expect(canItemTransition("QUEUED", "SERVED")).toBe(false);
     expect(canItemTransition("PREPARING", "SERVED")).toBe(false);
     expect(canItemTransition("SERVED", "QUEUED")).toBe(false);
-    expect(canItemTransition("READY", "QUEUED")).toBe(false);
   });
   it("item tidak bisa diubah saat pesanan menunggu, batal, atau selesai", () => {
     for (const o of ["PENDING", "CANCELLED", "COMPLETED"] as OrderStatus[]) {
@@ -191,5 +192,28 @@ describe("tampilan", () => {
   it("label Diantar jadi Diambil untuk takeaway", () => {
     expect(itemStatusLabel("SERVED", "DINE_IN")).toBe("Diantar");
     expect(itemStatusLabel("SERVED", "TAKEAWAY")).toBe("Diambil");
+  });
+});
+
+describe("ketuk item di layar dapur", () => {
+  it("satu ketuk maju satu langkah sampai diantar", () => {
+    expect(nextItemStep("QUEUED")).toBe("PREPARING");
+    expect(nextItemStep("PREPARING")).toBe("READY");
+    expect(nextItemStep("READY")).toBe("SERVED");
+    expect(nextItemStep("SERVED")).toBeNull();
+  });
+  it("menu langsung siap melewati Disiapkan, dan koreksinya kembali ke Antre", () => {
+    expect(nextItemStep("QUEUED", true)).toBe("READY");
+    expect(prevItemStep("READY", true)).toBe("QUEUED");
+    expect(prevItemStep("READY", false)).toBe("PREPARING");
+  });
+  it("setiap langkah maju & mundur adalah transisi yang sah di server", () => {
+    for (const s of ITEM_STATUSES)
+      for (const quick of [false, true]) {
+        const n = nextItemStep(s, quick);
+        const p = prevItemStep(s, quick);
+        if (n) expect(canItemTransition(s, n)).toBe(true);
+        if (p) expect(canItemTransition(s, p)).toBe(true);
+      }
   });
 });

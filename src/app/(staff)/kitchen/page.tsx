@@ -17,7 +17,7 @@ export default async function KitchenPage() {
         { status: "READY", readyAt: { gte: new Date(Date.now() - 1000 * 60 * 60 * 3) } },
       ],
     },
-    include: { items: { orderBy: { id: "asc" } }, table: { select: { name: true } } },
+    include: { items: { orderBy: { id: "asc" }, include: { product: { select: { quickReady: true } } } }, table: { select: { name: true } } },
     orderBy: { confirmedAt: "asc" },
   });
   return (
@@ -42,6 +42,7 @@ export default async function KitchenPage() {
           quantity: i.quantity,
           note: i.note,
           status: i.status,
+          quickReady: i.product?.quickReady ?? false,
           modifiers: (i.modifiers as { option: string }[]).map((m) => m.option),
         })),
       }))}
