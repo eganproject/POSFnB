@@ -71,7 +71,7 @@ export function OrdersBoard({
   q: string;
   date: string;
   role: Role;
-  counts: { action: number; active: number; unpaid: number };
+  counts: Record<string, number>;
   orders: BoardOrder[];
   selected: BoardOrder | null;
   requests: { id: string; type: string; tableName: string; createdAt: string }[];
@@ -100,31 +100,44 @@ export function OrdersBoard({
         </div>
       )}
 
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:px-0">
+      <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-center">
+        <div className="no-scrollbar -mx-4 flex gap-1.5 overflow-x-auto px-4 lg:mx-0 lg:shrink-0 lg:px-0">
           {TABS.map((t) => {
-            const count = (counts as Record<string, number>)[t.key];
+            const count = counts[t.key] ?? 0;
+            const current = tab === t.key;
+            const urgent = t.key === "action" && count > 0;
             return (
               <Link
                 key={t.key}
                 href={href({ tab: t.key, id: undefined })}
+                aria-label={count > 0 ? `${t.label} (${count})` : t.label}
                 className={cn(
                   "flex shrink-0 items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition",
-                  tab === t.key ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-muted"
+                  count > 0 && "pr-2",
+                  current ? "border-foreground bg-foreground text-background" : "bg-card hover:bg-muted"
                 )}
               >
                 {t.label}
-                {count ? (
-                  <span className={cn("grid min-w-5 place-items-center rounded-full px-1.5 text-[11px] font-bold", t.key === "action" ? "bg-primary text-primary-foreground" : tab === t.key ? "bg-background/20" : "bg-muted")}>
-                    {count}
+                {count > 0 && (
+                  <span
+                    className={cn(
+                      "inline-flex h-5 min-w-5 items-center justify-center rounded-full px-1.5 text-[11px] font-semibold leading-none tabular-nums",
+                      urgent
+                        ? "bg-primary text-primary-foreground"
+                        : current
+                          ? "bg-background/20 text-background"
+                          : "bg-foreground/[0.07] text-foreground/80"
+                    )}
+                  >
+                    {count > 99 ? "99+" : count}
                   </span>
-                ) : null}
+                )}
               </Link>
             );
           })}
         </div>
         <form
-          className="flex gap-2"
+          className="flex gap-2 lg:ml-auto"
           onSubmit={(e) => {
             e.preventDefault();
             router.push(href({ q: search || undefined, id: undefined }));
