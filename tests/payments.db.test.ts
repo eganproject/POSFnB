@@ -87,7 +87,7 @@ describe.skipIf(!enabled)("pembayaran (database)", () => {
 
   it("pembayaran online yang masuk telat untuk pesanan batal ditandai perlu refund", async () => {
     const order = await newOrder();
-    const p = await createGatewayPayment({ orderId: order.id });
+    const p = await createGatewayPayment({ orderId: order.id, channel: "qris" });
     await setOrderStatus(order.id, "CANCELLED", { role: "KASIR", reason: "tidak jadi", userId });
     // Webhook Midtrans datang belakangan (dua kali, seperti retry)
     await Promise.all([applyGatewayState(p.id, "SUCCESS", { late: true }), applyGatewayState(p.id, "SUCCESS", { late: true })]);

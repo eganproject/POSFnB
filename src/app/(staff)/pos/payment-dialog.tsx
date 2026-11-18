@@ -10,8 +10,9 @@ import { QtyStepper } from "@/components/ui/qty";
 import { Skeleton } from "@/components/ui/misc";
 import { DemoPaymentDialog } from "@/components/shared/demo-payment";
 import { cn, formatRupiah, pad } from "@/lib/utils";
-import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { useSnap } from "@/hooks/use-snap";
+import { CorePayment, type ChannelOption } from "@/components/shared/core-payment";
+import { paymentLabel } from "@/lib/payment-channels";
 import { getOrderForPayment, payOrder, startStaffOnlinePayment, type PaymentOrder } from "@/server/actions/staff";
 import { MoneyInput } from "./shift";
 import { quickCash, splitAmount } from "@/lib/payment-math";
@@ -35,8 +36,9 @@ export function PaymentDialog({
 }: {
   orderId: string | null;
   onClose: () => void;
-  config: { demo: boolean; online: boolean; clientKey: string; isProduction: boolean };
+  config: { demo: boolean; online: boolean; mode: "snap" | "core"; clientKey: string; isProduction: boolean; cashierChannels: ChannelOption[] };
 }) {
+  const core = config.mode === "core";
   const [order, setOrder] = useState<PaymentOrder | null>(null);
   const [mode, setMode] = useState<Mode>("full");
   const [people, setPeople] = useState(2);
@@ -51,7 +53,7 @@ export function PaymentDialog({
   // Popup Snap dirender di luar dialog ini. Selama popup terbuka, dialog kasir
   // disembunyikan supaya kunci klik/fokus/scroll milik dialog tidak menghalangi popup.
   const [snapOpen, setSnapOpen] = useState(false);
-  const snap = useSnap(config.clientKey, config.isProduction, !config.demo && !!orderId);
+  const snap = useSnap(config.clientKey, config.isProduction, !core && !config.demo && !!orderId);
 
   const load = useCallback(async () => {
     if (!orderId) return;
@@ -109,19 +111,24 @@ export function PaymentDialog({
   };
 
   const label = order && mode !== "full" ? `Tamu ${order.successCount + 1}` : null;
+  const splitItems = mode === "items" ? Object.entries(picked).filter(([, q]) => q > 0).map(([itemId, quantity]) => ({ itemId, quantity })) : undefined;
+  const startCore = useCallback(
+    (channel: Parameters<typeof startStaffOnlinePayment>[3]) => startStaffOnlinePayment(order!.id, amount, label ?? undefined, channel, splitItems),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [order?.id, amount, label, JSON.stringify(splitItems)]
+  );
 
   const submit = async () => {
     if (!order || amount <= 0) return;
     setLoading(true);
     if (method === "MIDTRANS") {
-      const r = await startStaffOnlinePayment(order.id, amount, label ?? undefined);
+      const r = await startStaffOnlinePayment(order.id, amount, label ?? undefined, null, splitItems);
       setLoading(false);
       if (!r.ok) return toast.error(r.error);
-      if (mode === "items") toast.info("Split per item via online tidak menandai item. Gunakan bagi rata atau tunai/EDC untuk per item.");
       if (r.data.demo) return setDemoPaymentId(r.data.paymentId);
       setPendingOnline(r.data.paymentId);
       setSnapOpen(true);
-      const opened = snap.pay(r.data.token, {
+      const opened = !!r.data.token && snap.pay(r.data.token, {
         onSuccess: () => {
           setSnapOpen(false);
           afterPayment(0).then(() => setPendingOnline(null));
@@ -149,7 +156,7 @@ export function PaymentDialog({
       cashReceived: method === "CASH" ? cash : null,
       reference: reference || null,
       label,
-      items: mode === "items" ? Object.entries(picked).filter(([, q]) => q > 0).map(([itemId, quantity]) => ({ itemId, quantity })) : undefined,
+      items: splitItems,
     });
     setLoading(false);
     if (!r.ok) return toast.error(r.error);
@@ -234,7 +241,7 @@ export function PaymentDialog({
                   </div>
                   {order.payments.filter((p) => p.state === "SUCCESS").map((p) => (
                     <div key={p.id} className="flex justify-between text-xs text-success">
-                      <span>{PAYMENT_METHOD_LABEL[p.method]}{p.label ? ` · ${p.label}` : ""}</span>
+                      <span>{paymentLabel(p)}{p.label ? ` · ${p.label}` : ""}</span>
                       <span className="tabular">−{formatRupiah(p.amount)}</span>
                     </div>
                   ))}
@@ -310,7 +317,22 @@ export function PaymentDialog({
                   {(method === "QRIS_STATIC" || method === "CARD" || method === "TRANSFER") && (
                     <Input value={reference} onChange={(e) => setReference(e.target.value)} placeholder="No. referensi / approval (opsional)" />
                   )}
-                  {method === "MIDTRANS" && (
+                  {method === "MIDTRANS" && core && amount > 0 && (
+                    <CorePayment
+                      key={`${order.id}-${amount}-${mode}-${JSON.stringify(splitItems ?? [])}`}
+                      variant="cashier"
+                      amount={amount}
+                      channels={config.cashierChannels}
+                      initial={null}
+                      start={startCore}
+                      demo={config.demo}
+                      onPaid={() => {
+                        toast.success("Pembayaran online diterima");
+                        afterPayment(0);
+                      }}
+                    />
+                  )}
+                  {method === "MIDTRANS" && !core && (
                     <p className="rounded-xl bg-muted p-3 text-xs text-muted-foreground">
                       {pendingOnline
                         ? "⏳ Menunggu customer menyelesaikan pembayaran… status dicek otomatis."
@@ -320,7 +342,7 @@ export function PaymentDialog({
                     </p>
                   )}
                 </div>
-                <div className="border-t p-5">
+                <div className={cn("border-t p-5", method === "MIDTRANS" && core && "hidden")}>
                   <Button
                     size="xl"
                     className="w-full"

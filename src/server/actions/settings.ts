@@ -1,9 +1,11 @@
 "use server";
 import { z } from "zod";
+import { Prisma } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { assertUser } from "@/lib/session";
-import { encryptSecret, invalidateAppConfig, readSettingsRow } from "@/server/settings";
+import { encryptSecret, getMidtransConfig, invalidateAppConfig, readSettingsRow, saveChannelStatus, type ChannelStatusMap } from "@/server/settings";
+import { CHANNEL_INFO, CORE_CHANNELS, type CoreChannel } from "@/lib/payment-channels";
 
 export type SettingsResult = { ok: true } | { ok: false; error: string };
 
@@ -43,7 +45,7 @@ export async function saveMidtransSettings(input: z.input<typeof midtransSchema>
     const me = await assertUser(["OWNER"]);
     const d = midtransSchema.parse(input);
     if (d.clear) {
-      await upsert({ midtransServerKey: null, midtransClientKey: null, midtransIsProduction: null }, me.id);
+      await upsert({ midtransServerKey: null, midtransClientKey: null, midtransIsProduction: null, midtransChannelStatus: Prisma.DbNull }, me.id);
       return { ok: true };
     }
     const row = await readSettingsRow();
@@ -60,6 +62,8 @@ export async function saveMidtransSettings(input: z.input<typeof midtransSchema>
         ...(serverKey ? { midtransServerKey: encryptSecret(serverKey) } : {}),
         midtransClientKey: clientKey,
         midtransIsProduction: d.isProduction,
+        // Akun / mode bisa berbeda: hasil cek kanal lama tidak berlaku lagi
+        midtransChannelStatus: Prisma.DbNull,
       },
       me.id
     );
@@ -96,10 +100,70 @@ export async function saveGoogleSettings(input: z.input<typeof googleSchema>): P
   }
 }
 
+const modeSchema = z.object({
+  mode: z.enum(["snap", "core"]),
+  channels: z.array(z.enum(CORE_CHANNELS)).max(CORE_CHANNELS.length),
+});
+
+/** Pilih tampilan bayar: Snap (popup Midtrans) atau Core API (layar bayar sendiri) + kanal yang ditawarkan */
+export async function saveMidtransMode(input: z.input<typeof modeSchema>): Promise<SettingsResult> {
+  try {
+    const me = await assertUser(["OWNER"]);
+    const d = modeSchema.parse(input);
+    if (d.mode === "core" && d.channels.length === 0) throw new Error("Pilih minimal satu metode bayar untuk mode Core API.");
+    await upsert({ midtransMode: d.mode, midtransCoreChannels: CORE_CHANNELS.filter((c) => d.channels.includes(c)) }, me.id);
+    return { ok: true };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+export type ChannelCheck = { channel: CoreChannel; ok: boolean; message: string; inactive: boolean };
+
+/**
+ * Cek kanal Core API satu per satu dengan transaksi uji Rp10.000 yang langsung dibatalkan.
+ * Kanal yang ditolak Midtrans (belum diaktifkan) otomatis disembunyikan dari pelanggan.
+ */
+export async function checkMidtransChannels(channels?: CoreChannel[]): Promise<{ ok: boolean; message: string; results: ChannelCheck[] }> {
+  await assertUser(["OWNER"]);
+  const cfg = await getMidtransConfig();
+  if (!cfg.enabled) return { ok: false, message: "Key Midtrans belum diisi. Mode demo tidak perlu dicek.", results: [] };
+  const { createCoreCharge, expireTransaction, ChargeError } = await import("@/server/midtrans");
+  const list = (channels?.length ? channels : cfg.coreChannels).filter((c) => (CORE_CHANNELS as readonly string[]).includes(c));
+  const at = new Date().toISOString();
+  const results = await Promise.all(
+    list.map(async (channel): Promise<ChannelCheck> => {
+      const orderId = `CEK-${channel.toUpperCase().replace(/_/g, "")}-${Date.now().toString(36)}`;
+      try {
+        await createCoreCharge(
+          { orderId, amount: 10_000, channel, itemName: "Cek metode bayar", callbackUrl: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000" },
+          cfg
+        );
+        await expireTransaction(orderId);
+        return { channel, ok: true, inactive: false, message: `${CHANNEL_INFO[channel].label} aktif.` };
+      } catch (e) {
+        return { channel, ok: false, inactive: e instanceof ChargeError && e.inactive, message: e instanceof Error ? e.message : "Gagal dicek." };
+      }
+    })
+  );
+  const status: ChannelStatusMap = {};
+  // Hanya kanal yang jelas belum aktif yang disembunyikan; gangguan sesaat tidak menyembunyikan kanal
+  for (const r of results) status[r.channel] = { ok: r.ok || !r.inactive, message: r.message, at };
+  await saveChannelStatus(status);
+  revalidatePath("/", "layout");
+  const bad = results.filter((r) => !r.ok);
+  return {
+    ok: bad.length === 0,
+    message: bad.length
+      ? `${bad.length} metode belum bisa dipakai.${bad.some((b) => b.inactive) ? " Metode yang belum aktif disembunyikan dari pelanggan." : ""}`
+      : "Semua metode yang dipilih aktif.",
+    results,
+  };
+}
+
 /** Cek apakah Server Key yang aktif diterima Midtrans (tanpa membuat transaksi) */
 export async function testMidtransConnection(): Promise<{ ok: boolean; message: string }> {
   await assertUser(["OWNER"]);
-  const { getMidtransConfig } = await import("@/server/settings");
   const cfg = await getMidtransConfig();
   if (!cfg.enabled) return { ok: false, message: "Key Midtrans belum diisi. Aplikasi berjalan di mode demo." };
   const base = cfg.isProduction ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
@@ -110,7 +174,10 @@ export async function testMidtransConnection(): Promise<{ ok: boolean; message: 
     });
     const json = (await res.json().catch(() => ({}))) as { status_code?: string; status_message?: string };
     // 404 = key diterima, transaksi uji memang tidak ada
-    if (json.status_code === "404") return { ok: true, message: `Terhubung ke Midtrans ${cfg.isProduction ? "Production" : "Sandbox"}. Server Key valid.` };
+    if (json.status_code === "404") {
+      const how = cfg.mode === "core" ? "Mode Core API: tekan “Cek metode aktif” untuk memastikan tiap metode bisa dipakai." : "Mode Snap (popup Midtrans).";
+      return { ok: true, message: `Terhubung ke Midtrans ${cfg.isProduction ? "Production" : "Sandbox"}. Server Key valid. ${how}` };
+    }
     if (json.status_code === "401") return { ok: false, message: "Server Key ditolak Midtrans (401). Cek lagi key dan mode Sandbox/Production." };
     return { ok: false, message: json.status_message || `Respons Midtrans: ${res.status}` };
   } catch {

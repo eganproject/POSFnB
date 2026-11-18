@@ -1,13 +1,18 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, Copy, CreditCard, ExternalLink, KeyRound, PlugZap, ShieldCheck } from "lucide-react";
+import { AppWindow, Check, Copy, CreditCard, ExternalLink, KeyRound, LayoutTemplate, ListChecks, PlugZap, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/misc";
-import { saveGoogleSettings, saveMidtransSettings, testMidtransConnection } from "@/server/actions/settings";
+import { checkMidtransChannels, saveGoogleSettings, saveMidtransMode, saveMidtransSettings, testMidtransConnection } from "@/server/actions/settings";
+import { CHANNEL_INFO, CORE_CHANNELS, type CoreChannel, type MidtransMode } from "@/lib/payment-channels";
+import { ChannelBadge } from "@/components/shared/core-payment";
+import { cn } from "@/lib/utils";
+
+type ChannelStatus = { ok: boolean; message: string; at: string };
 
 type Source = "settings" | "env" | "none";
 
@@ -62,9 +67,18 @@ function Section({ icon: Icon, title, desc, source, children }: { icon: typeof K
 
 export function SettingsForms({
   midtrans,
+  paymentMode,
   google,
   updatedAt,
 }: {
+  paymentMode: {
+    mode: MidtransMode;
+    modeFromSettings: boolean;
+    channels: CoreChannel[];
+    status: Partial<Record<CoreChannel, ChannelStatus>>;
+    keysReady: boolean;
+    isProduction: boolean;
+  };
   midtrans: {
     source: Source;
     isProduction: boolean;
@@ -134,7 +148,7 @@ export function SettingsForms({
           >
             <Input name="serverKey" type="password" autoComplete="off" placeholder={midtrans.storedServerKeyMasked ?? "SB-Mid-server-…"} />
           </Field>
-          <Field label="Client Key" hint="Boleh publik, dipakai untuk membuka jendela bayar Snap.">
+          <Field label="Client Key" hint="Boleh publik, dipakai untuk membuka jendela bayar Snap (tidak dipakai di mode Core API).">
             <Input name="clientKey" defaultValue={midtrans.storedClientKey} autoComplete="off" placeholder="SB-Mid-client-…" required />
           </Field>
           <label className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
@@ -189,6 +203,8 @@ export function SettingsForms({
           </a>
         </form>
       </Section>
+
+      <PaymentModeSection {...paymentMode} />
 
       <Section
         icon={KeyRound}
@@ -266,5 +282,169 @@ export function SettingsForms({
         {updatedAt && ` Terakhir diubah ${new Date(updatedAt).toLocaleString("id-ID", { dateStyle: "medium", timeStyle: "short" })}.`}
       </p>
     </div>
+  );
+}
+
+const MODES: { v: MidtransMode; title: string; icon: typeof AppWindow; desc: string; points: string[] }[] = [
+  {
+    v: "snap",
+    title: "Snap (popup Midtrans)",
+    icon: AppWindow,
+    desc: "Jendela bayar bawaan Midtrans. Paling mudah, semua metode yang aktif di akun langsung muncul.",
+    points: ["Tampilan dari Midtrans", "Kartu kredit, paylater, dll ikut tersedia"],
+  },
+  {
+    v: "core",
+    title: "Core API (tampilan sendiri)",
+    icon: LayoutTemplate,
+    desc: "Layar bayar bergaya outlet di aplikasi ini, tanpa popup. QR, tombol buka e-wallet, dan nomor VA tampil langsung.",
+    points: ["QRIS + hitung mundur", "GoPay / ShopeePay buka aplikasi di HP, QR di layar kasir", "Virtual Account dengan tombol salin & cara bayar"],
+  },
+];
+
+function PaymentModeSection({
+  mode: initialMode,
+  modeFromSettings,
+  channels: initialChannels,
+  status,
+  keysReady,
+  isProduction,
+}: {
+  mode: MidtransMode;
+  modeFromSettings: boolean;
+  channels: CoreChannel[];
+  status: Partial<Record<CoreChannel, ChannelStatus>>;
+  keysReady: boolean;
+  isProduction: boolean;
+}) {
+  const router = useRouter();
+  const [mode, setMode] = useState<MidtransMode>(initialMode);
+  const [channels, setChannels] = useState<CoreChannel[]>(initialChannels);
+  const [saving, startSave] = useTransition();
+  const [checking, startCheck] = useTransition();
+  const dirty = mode !== initialMode || channels.join() !== initialChannels.join();
+  const toggle = (c: CoreChannel) => setChannels((list) => (list.includes(c) ? list.filter((x) => x !== c) : CORE_CHANNELS.filter((x) => x === c || list.includes(x))));
+
+  return (
+    <section className="rounded-2xl border bg-card shadow-xs xl:col-span-2">
+      <header className="flex flex-col gap-3 border-b p-5 sm:flex-row sm:items-start sm:justify-between">
+        <div className="flex gap-3">
+          <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><LayoutTemplate className="size-5" /></span>
+          <div>
+            <h2 className="font-bold">Tampilan pembayaran online</h2>
+            <p className="text-sm text-muted-foreground">Berlaku untuk pelanggan (menu QR & takeaway) dan kasir (QRIS / E-wallet).</p>
+          </div>
+        </div>
+        <Badge variant={modeFromSettings ? "success" : "secondary"} className="self-start">
+          {initialMode === "core" ? "Core API" : "Snap"}{modeFromSettings ? "" : " · bawaan"}
+        </Badge>
+      </header>
+      <div className="grid gap-5 p-5 lg:grid-cols-[1fr_1.2fr]">
+        <div className="grid content-start gap-3">
+          {MODES.map((m) => (
+            <button
+              key={m.v}
+              type="button"
+              onClick={() => setMode(m.v)}
+              className={cn(
+                "flex gap-3 rounded-2xl border p-4 text-left transition",
+                mode === m.v ? "border-primary bg-primary/5 ring-1 ring-primary" : "hover:bg-muted/60"
+              )}
+            >
+              <span className={cn("grid size-10 shrink-0 place-items-center rounded-xl", mode === m.v ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
+                <m.icon className="size-5" />
+              </span>
+              <span className="space-y-1">
+                <span className="flex items-center gap-2 font-semibold">
+                  {m.title}
+                  {mode === m.v && <Check className="size-4 text-primary" />}
+                </span>
+                <span className="block text-xs text-muted-foreground">{m.desc}</span>
+                <span className="flex flex-wrap gap-1 pt-1">
+                  {m.points.map((p) => (
+                    <span key={p} className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{p}</span>
+                  ))}
+                </span>
+              </span>
+            </button>
+          ))}
+          {!keysReady && (
+            <p className="rounded-xl bg-honey/15 px-3 py-2 text-xs text-[oklch(0.45_0.1_70)]">
+              Key Midtrans belum diisi: kedua mode berjalan sebagai simulasi (mode demo) sehingga tampilannya tetap bisa dicoba.
+            </p>
+          )}
+        </div>
+
+        <div className={cn("space-y-3", mode !== "core" && "pointer-events-none opacity-50")} aria-disabled={mode !== "core"}>
+          <div className="flex items-center justify-between gap-2">
+            <p className="text-sm font-semibold">Metode yang ditawarkan (Core API)</p>
+            <span className="text-xs text-muted-foreground">{channels.length} dipilih</span>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {CORE_CHANNELS.map((c) => {
+              const st = status[c];
+              const on = channels.includes(c);
+              return (
+                <label key={c} className={cn("flex cursor-pointer items-center gap-3 rounded-xl border p-2.5 transition", on ? "border-primary/50 bg-primary/5" : "hover:bg-muted/60")}>
+                  <input type="checkbox" className="size-4 accent-[var(--primary)]" checked={on} onChange={() => toggle(c)} />
+                  <ChannelBadge channel={c} className="h-7 min-w-10 text-[10px]" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-medium">{CHANNEL_INFO[c].label}</span>
+                    {st && (
+                      <span className={cn("block truncate text-[11px]", st.ok ? "text-success" : "text-destructive")} title={st.message}>
+                        {st.ok ? "✓ Aktif" : `✕ ${st.message}`}
+                      </span>
+                    )}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Di kasir hanya QRIS, GoPay, dan ShopeePay yang ditampilkan (QR di layar). Metode yang ditolak Midtrans saat dicek atau saat dipakai
+            otomatis disembunyikan sampai dicek ulang.
+          </p>
+          <div className="rounded-xl bg-muted/40 p-3 text-xs text-muted-foreground">
+            <p className="font-semibold text-foreground">Aktifkan di dashboard Midtrans {isProduction ? "Production" : "Sandbox"}</p>
+            <p>Settings → Payment → aktifkan metode yang dipilih (QRIS, GoPay, ShopeePay, Bank Transfer per bank, Mandiri Bill). Di Production, setiap metode perlu disetujui Midtrans dulu.</p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 lg:col-span-2">
+          <Button
+            loading={saving}
+            disabled={!dirty}
+            onClick={() =>
+              startSave(async () => {
+                const r = await saveMidtransMode({ mode, channels });
+                if (!r.ok) return void toast.error(r.error);
+                toast.success(mode === "core" ? "Mode Core API aktif. Pelanggan & kasir memakai layar bayar baru." : "Mode Snap aktif.");
+                router.refresh();
+              })
+            }
+          >
+            <ShieldCheck /> Simpan tampilan
+          </Button>
+          <Button
+            variant="outline"
+            loading={checking}
+            disabled={!keysReady || mode !== "core" || dirty}
+            title={dirty ? "Simpan dulu sebelum cek" : undefined}
+            onClick={() =>
+              startCheck(async () => {
+                const r = await checkMidtransChannels();
+                (r.ok ? toast.success : toast.error)(r.message);
+                router.refresh();
+              })
+            }
+          >
+            <ListChecks /> Cek metode aktif
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            {keysReady ? "Cek membuat transaksi uji Rp10.000 per metode lalu langsung dibatalkan." : "Isi key Midtrans untuk bisa cek metode."}
+          </span>
+        </div>
+      </div>
+    </section>
   );
 }

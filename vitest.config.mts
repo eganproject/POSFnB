@@ -5,7 +5,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  test: { include: ["tests/**/*.test.ts"], environment: "node" },
+  // Tes database memakai satu database bersama (mis. pengaturan mode Midtrans), jadi file dijalankan berurutan
+  test: { include: ["tests/**/*.test.ts"], environment: "node", fileParallelism: process.env.TEST_DATABASE !== "1" },
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "src"),

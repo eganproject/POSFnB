@@ -1,7 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
 import { formatRupiah, pad } from "@/lib/utils";
-import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
+import { paymentLabel } from "@/lib/payment-channels";
 import { PrintButton } from "./print-button";
 
 export const metadata = { title: "Struk" };
@@ -76,7 +76,7 @@ export default async function ReceiptPage({ params, searchParams }: { params: Pr
         <Dash />
         <div className="space-y-0.5">
           {order.payments.map((p) => (
-            <Row key={p.id} l={`${PAYMENT_METHOD_LABEL[p.method]}${p.label ? ` (${p.label})` : ""}`} r={formatRupiah(p.cashReceived ?? p.amount)} />
+            <Row key={p.id} l={`${paymentLabel(p)}${p.label ? ` (${p.label})` : ""}`} r={formatRupiah(p.cashReceived ?? p.amount)} />
           ))}
           {change > 0 && <Row l="Kembalian" r={formatRupiah(change)} />}
           {paid < order.total && order.status !== "CANCELLED" && <Row l="BELUM DIBAYAR" r={formatRupiah(order.total - paid)} />}

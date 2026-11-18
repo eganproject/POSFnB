@@ -20,6 +20,7 @@ import { OrderStatusBadge } from "@/components/shared/status-badge";
 import { LiveAlerts } from "@/components/staff/live-alerts";
 import { createPosOrder } from "@/server/actions/staff";
 import { PaymentDialog } from "./payment-dialog";
+import type { PaymentClientConfig } from "@/server/midtrans";
 import { TablePayDialog } from "./table-pay-dialog";
 import { ShiftGate, ShiftChip } from "./shift";
 
@@ -45,7 +46,7 @@ export function PosApp(props: {
   shift: { id: string; openedAt: string; openingCash: number } | null;
   initialOrderId: string | null;
   requestCount: number;
-  payment: { demo: boolean; online: boolean; clientKey: string; isProduction: boolean };
+  payment: PaymentClientConfig;
 }) {
   const { user, outlet, categories, tables, openBills, shift } = props;
   const router = useRouter();

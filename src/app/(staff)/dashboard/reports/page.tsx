@@ -2,7 +2,6 @@ import Link from "next/link";
 import { Banknote, Download, Percent, Receipt, ShoppingBag, XCircle } from "lucide-react";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { businessDate, cn, formatRupiah, shiftDate } from "@/lib/utils";
-import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { bestSellers, dailySales, salesByCategory, salesByHour, salesByPaymentMethod, salesBySource, salesSummary } from "@/server/reports";
 import { PageHeader } from "@/components/staff/page-header";
 import { BarList, StatCard } from "@/components/staff/stat-card";
@@ -10,7 +9,6 @@ import { HourChart, RevenueChart } from "@/components/staff/charts";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { RangePicker } from "./range-picker";
-import type { PaymentMethod } from "@prisma/client";
 
 export const metadata = { title: "Laporan" };
 export const dynamic = "force-dynamic";
@@ -126,14 +124,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                 <>
                   <div className="flex h-3 overflow-hidden rounded-full">
                     {methods.map((m, i) => (
-                      <div key={m.method} style={{ width: `${(m.amount / methodTotal) * 100}%` }} className={cn(PALETTE[i % PALETTE.length])} />
+                      <div key={m.key} style={{ width: `${(m.amount / methodTotal) * 100}%` }} className={cn(PALETTE[i % PALETTE.length])} />
                     ))}
                   </div>
                   <ul className="grid gap-2 sm:grid-cols-2">
                     {methods.map((m, i) => (
-                      <li key={m.method} className="flex items-center gap-2 text-sm">
+                      <li key={m.key} className="flex items-center gap-2 text-sm">
                         <span className={cn("size-2.5 rounded-full", PALETTE[i % PALETTE.length])} />
-                        <span className="flex-1">{PAYMENT_METHOD_LABEL[m.method as PaymentMethod]}</span>
+                        <span className="flex-1">{m.label}</span>
                         <span className="font-semibold tabular">{Math.round((m.amount / methodTotal) * 100)}%</span>
                       </li>
                     ))}

@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { expireStaleOrders } from "@/server/orders";
 import { requireOutlet, requireUser } from "@/lib/session";
 import { getMenuForOutlet } from "@/server/menu";
-import { getSnapClientConfig } from "@/server/midtrans";
+import { getPaymentClientConfig } from "@/server/midtrans";
 import { PosApp } from "./pos-app";
 
 export const metadata = { title: "Kasir" };
@@ -55,7 +55,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
       shift={shift ? { id: shift.id, openedAt: shift.openedAt.toISOString(), openingCash: shift.openingCash } : null}
       initialOrderId={order ?? null}
       requestCount={requests}
-      payment={await getSnapClientConfig()}
+      payment={await getPaymentClientConfig()}
     />
   );
 }

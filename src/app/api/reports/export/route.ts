@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { getActiveOutlet, getCurrentUser } from "@/lib/session";
-import { PAYMENT_METHOD_LABEL, ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL } from "@/lib/constants";
+import { ORDER_STATUS_LABEL, PAYMENT_STATUS_LABEL } from "@/lib/constants";
+import { paymentLabel } from "@/lib/payment-channels";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export async function GET(request: Request) {
     o.total,
     ORDER_STATUS_LABEL[o.status],
     PAYMENT_STATUS_LABEL[o.paymentStatus],
-    [...new Set(o.payments.map((p) => PAYMENT_METHOD_LABEL[p.method]))].join(" + "),
+    [...new Set(o.payments.map((p) => paymentLabel(p)))].join(" + "),
     o.cashier?.name ?? "",
   ]);
   const csv = "﻿" + [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");

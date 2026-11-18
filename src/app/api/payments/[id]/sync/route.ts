@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { applyGatewayState } from "@/server/orders";
 import { getTransactionStatus, isMidtransEnabled, mapMidtransState } from "@/server/midtrans";
+import { channelFromStatus } from "@/lib/payment-channels";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -25,7 +26,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
     const state = mapMidtransState(status);
     // Transaksi yang belum dipilih metodenya di Snap tetap pending
     if (state !== payment.state) {
-      await applyGatewayState(payment.id, state, JSON.parse(JSON.stringify(status)), status.payment_type);
+      await applyGatewayState(payment.id, state, JSON.parse(JSON.stringify(status)), status.payment_type, channelFromStatus(status));
     }
     return Response.json({ state });
   } catch (e) {

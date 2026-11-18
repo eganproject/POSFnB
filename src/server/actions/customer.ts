@@ -5,6 +5,9 @@ import { channels, publish } from "@/lib/events";
 import { cartLineSchema, OrderError } from "@/server/pricing";
 import { applyGatewayState, createGatewayPayment, createOrder, voidPendingGatewayPayments } from "@/server/orders";
 import { isDemoPaymentAllowed, isMidtransEnabled, isOnlinePaymentAvailable } from "@/server/midtrans";
+import { getMidtransConfig } from "@/server/settings";
+import { CORE_CHANNELS, type CoreChannel } from "@/lib/payment-channels";
+import { toPaymentView, type OnlinePaymentView } from "@/lib/payment-view";
 import { rateLimit } from "@/lib/rate-limit";
 import { getCurrentCustomer } from "@/lib/session";
 import { canOrderAsap, isValidPickup } from "@/lib/pickup";
@@ -82,7 +85,8 @@ export async function placeOrder(
       customerId: customer?.id ?? null,
       pickupAt,
     });
-    if (data.payMethod === "ONLINE") {
+    // Snap: transaksi langsung disiapkan. Core API: pelanggan memilih metode dulu di halaman pesanan.
+    if (data.payMethod === "ONLINE" && (await getMidtransConfig()).mode === "snap") {
       try {
         await createGatewayPayment({ orderId: order.id });
       } catch (e) {
@@ -96,27 +100,26 @@ export async function placeOrder(
   }
 }
 
-/** Ambil / buat token Snap untuk sisa tagihan */
-export async function startOnlinePayment(
-  orderId: string
-): Promise<ActionResult<{ paymentId: string; token: string; demo: boolean; redirectUrl: string | null }>> {
+const startPaySchema = z.object({
+  orderId: z.string().min(1).max(40),
+  channel: z.enum(CORE_CHANNELS).nullable().optional(),
+});
+
+/**
+ * Mulai bayar online untuk sisa tagihan.
+ * Snap: token popup. Core API: data QR / deeplink / nomor VA untuk kanal yang dipilih.
+ */
+export async function startOnlinePayment(orderId: string, channel?: CoreChannel | null): Promise<ActionResult<OnlinePaymentView>> {
   try {
     if (!(await rateLimit("pay", 12))) throw new OrderError(TOO_MANY);
-    const order = await db.order.findUnique({ where: { id: orderId } });
+    const input = startPaySchema.parse({ orderId, channel });
+    const order = await db.order.findUnique({ where: { id: input.orderId } });
     if (!order) throw new OrderError("Pesanan tidak ditemukan.");
     if (order.payPreference !== "MIDTRANS") {
-      await db.order.update({ where: { id: orderId }, data: { payPreference: "MIDTRANS" } });
+      await db.order.update({ where: { id: input.orderId }, data: { payPreference: "MIDTRANS" } });
     }
-    const payment = await createGatewayPayment({ orderId });
-    return {
-      ok: true,
-      data: {
-        paymentId: payment.id,
-        token: payment.snapToken!,
-        demo: !(await isMidtransEnabled()),
-        redirectUrl: payment.snapRedirectUrl,
-      },
-    };
+    const payment = await createGatewayPayment({ orderId: input.orderId, channel: input.channel ?? null });
+    return { ok: true, data: toPaymentView(payment, !(await isMidtransEnabled())) };
   } catch (e) {
     return fail(e);
   }

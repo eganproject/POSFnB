@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { getSnapClientConfig } from "@/server/midtrans";
+import { getPaymentClientConfig } from "@/server/midtrans";
+import { toPaymentView } from "@/lib/payment-view";
 import { pickupLabel } from "@/lib/pickup-label";
 import { OrderTracker } from "@/components/customer/order-tracker";
 
@@ -48,13 +49,12 @@ export default async function OrderPage({
     etaMinutes = Math.max(2, Math.round(avg + ahead * avg * 0.35 - elapsed));
   }
   const pending = order.payments.findLast((p) => p.method === "MIDTRANS" && p.state === "PENDING");
-  const snap = await getSnapClientConfig();
+  const cfg = await getPaymentClientConfig();
   return (
     <OrderTracker
       autoPay={pay === "1"}
-      demo={snap.demo}
-      clientKey={snap.clientKey}
-      isProduction={snap.isProduction}
+      payment={{ demo: cfg.demo, mode: cfg.mode, clientKey: cfg.clientKey, isProduction: cfg.isProduction, channels: cfg.channels }}
+      pendingPayment={pending ? toPaymentView(pending, cfg.demo) : null}
       order={{
         id: order.id,
         code: order.code,
@@ -94,7 +94,7 @@ export default async function OrderPage({
         })),
         payments: order.payments
           .filter((p) => p.state === "SUCCESS")
-          .map((p) => ({ id: p.id, method: p.method, amount: p.amount, gatewayType: p.gatewayType })),
+          .map((p) => ({ id: p.id, method: p.method, amount: p.amount, gatewayType: p.gatewayType, gatewayChannel: p.gatewayChannel })),
       }}
     />
   );
