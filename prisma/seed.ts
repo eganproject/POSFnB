@@ -11,142 +11,307 @@ type Group = { name: string; min: number; max: number; options: Opt[] };
 type Item = { name: string; price: number; desc: string; emoji?: string; image?: string; featured?: boolean; groups?: Group[] };
 
 /**
- * Menu Warm Hour Cafe, disalin dari MENU.pdf di linktr.ee/warmhourcafe (November 2026).
- * Harga dalam Rupiah. Foto di /public/warmhour berasal dari profil Google Maps cafe.
+ * Menu Amalgam Coffee Brewery, disalin dari "AMALGAM - Menu.pdf" (tautan "See our Menu" di amalgamcoffee.com, November 2026).
+ * Harga dalam Rupiah, belum termasuk pajak & service. Foto di /public/amalgam dipotong dari buku menu yang sama.
+ * Kepiting dan ikan kerapu (harga per 100 gr / market price) sengaja tidak dimasukkan: atur manual di dashboard bila perlu.
  */
 const K = 1000;
-const img = (name: string) => `/warmhour/${name}.jpg`;
+const img = (name: string) => `/amalgam/${name}.jpg`;
 
 /** Pilihan suhu; harga dasar produk = varian termurah, selisihnya jadi priceDelta. */
 const suhu = (hot: number | null, ice: number | null): Group => {
   const base = Math.min(...[hot, ice].filter((v): v is number => v !== null));
   const options: Opt[] = [];
-  if (ice !== null) options.push({ name: "Ice", price: (ice - base) * K, default: true });
+  if (ice !== null) options.push({ name: "Iced", price: (ice - base) * K, default: true });
   if (hot !== null) options.push({ name: "Hot", price: (hot - base) * K, default: ice === null });
   return { name: "Suhu", min: 1, max: 1, options };
 };
-const extraKopi: Group = { name: "Tambahan", min: 0, max: 2, options: [{ name: "Additional shot", price: 10 * K }, { name: "Ganti oat milk", price: 7 * K }] };
-const ceremonial: Group = { name: "Upgrade", min: 0, max: 1, options: [{ name: "Ceremonial matcha", price: 12 * K }] };
-const manis: Group = { name: "Tingkat manis", min: 1, max: 1, options: [{ name: "Normal", default: true }, { name: "Less sweet" }] };
-const COCOLAN = ["Pandan Kaya", "Thai Tea", "Hojicha", "Creamy Milk", "Milo"];
-const roti: Group = { name: "Roti", min: 1, max: 1, options: [{ name: "Kukus", default: true }, { name: "Bakar" }] };
-const cocolan: Group = { name: "Cocolan (termasuk 1)", min: 1, max: 1, options: COCOLAN.map((name, i) => ({ name, default: i === 0 })) };
-const ekstraCocolan: Group = { name: "Ekstra cocolan", min: 0, max: 4, options: COCOLAN.map((name) => ({ name: `Ekstra ${name}`, price: 10 * K })) };
-const telur: Group = { name: "Porsi", min: 1, max: 1, options: [{ name: "1 Egg", default: true }, { name: "2 Eggs", price: 8 * K }] };
-const pedas: Group = { name: "Level pedas", min: 1, max: 1, options: [{ name: "Level 0" }, { name: "Level 1", default: true }, { name: "Level 2" }, { name: "Level 3" }] };
-const protein: Group = { name: "Protein", min: 1, max: 1, options: [{ name: "Chicken", default: true }, { name: "Pork", price: 5 * K }] };
+/** Semua minuman susu: Greenfields (harga dasar) atau Oatly (+15 rb), sesuai buku menu. */
+const susu: Group = { name: "Susu", min: 1, max: 1, options: [{ name: "Greenfields milk", default: true }, { name: "Oatly", price: 15 * K }] };
+const extraShot: Group = { name: "Tambahan", min: 0, max: 2, options: [{ name: "Extra shot espresso", price: 15 * K }] };
+const sausSteak: Group = { name: "Saus", min: 1, max: 1, options: [{ name: "Mushroom", default: true }, { name: "Black pepper" }, { name: "BBQ" }] };
 
-const kopi = (name: string, hot: number | null, ice: number | null, desc: string, extra: Partial<Item> = {}): Item => ({
-  name,
-  emoji: "☕",
-  price: Math.min(...[hot, ice].filter((v): v is number => v !== null)) * K,
-  desc,
-  groups: [suhu(hot, ice), extraKopi],
-  ...extra,
+const kopi = (name: string, hot: number | null, ice: number | null, extra: Partial<Item> & { milk?: boolean } = {}): Item => {
+  const { milk, ...rest } = extra;
+  const groups: Group[] = [];
+  if (hot !== null && ice !== null) groups.push(suhu(hot, ice));
+  if (milk) groups.push(susu);
+  groups.push(extraShot);
+  return { name, emoji: "☕", price: Math.min(...[hot, ice].filter((v): v is number => v !== null)) * K, desc: "", groups, ...rest };
+};
+const frappe = (name: string, price: number, extra: Partial<Item> = {}): Item => ({ name, emoji: "🥤", price: price * K, desc: "", groups: [susu], ...extra });
+const nonKopi = (name: string, hot: number, ice: number, extra: Partial<Item> = {}): Item => ({
+  name, emoji: "🍫", price: Math.min(hot, ice) * K, desc: "", groups: [suhu(hot, ice), susu], ...extra,
 });
-const matcha = (name: string, price: number, desc: string, extra: Partial<Item> = {}): Item => ({
-  name,
-  emoji: "🍵",
-  price: price * K,
-  desc,
-  groups: [ceremonial, manis],
-  ...extra,
-});
+const dish = (name: string, price: number, desc: string, emoji: string, extra: Partial<Item> = {}): Item => ({ name, price: price * K, desc, emoji, ...extra });
 
 const MENU: { name: string; icon: string; items: Item[] }[] = [
+  {
+    name: "Signature Coffee",
+    icon: "✨",
+    items: [
+      dish("Americano Lemon", 53, "Refreshing americano brightened with lemon.", "🍋", { featured: true, image: img("americano-lemon") }),
+      dish("Pina Sour Coffee", 53, "Americano with pineapple, fresh and lightly sour.", "🍍", { image: img("pina-sour") }),
+      dish("Americano Mango", 53, "Iced americano with mango.", "🥭"),
+      dish("Americano Ginger", 63, "Iced americano with ginger.", "🫚"),
+      dish("Coffee Bloom", 53, "Coffee mocktail.", "🌸"),
+    ],
+  },
   {
     name: "Coffee",
     icon: "☕",
     items: [
-      kopi("Montblanc", null, 45, "Kopi dingin dengan krim lembut dan taburan kulit jeruk.", { featured: true, image: img("montblanc") }),
-      kopi("Dirty Latte", null, 45, "Espresso dituang di atas susu dingin.", { featured: true, image: img("dirty-latte") }),
-      kopi("Kopi Susu", null, 30, "Es kopi susu khas Warm Hour.", { image: img("kopi-susu") }),
-      kopi("Espresso", 27, null, "Single origin, diseduh pendek."),
-      kopi("Black", 33, 35, "Espresso dengan air, panas atau dingin.", { image: img("black") }),
-      kopi("White", 36, 42, "Espresso dengan susu steamed."),
-      kopi("Piccolo", 36, null, "Ristretto dengan sedikit susu."),
-      kopi("Cappucino", 36, null, "Espresso, susu, dan foam tebal."),
-      kopi("Magic", 36, null, "Double ristretto dengan susu, gaya Melbourne."),
-      kopi("Dirty Chai", null, 45, "Chai latte dengan satu shot espresso."),
+      kopi("Espresso", 25, null, { desc: "Fresh coffee, roasted daily." }),
+      kopi("Espresso on the Rock", null, 30),
+      kopi("Americano", 32, 40),
+      kopi("Vietnam Drip", 35, null),
+      kopi("Manual Brew V60", 40, null, { desc: "Single origin: Gayo, Garut, Gunung Halu, Ijen, Kerinci, atau Puntang." }),
+      kopi("Japanese Manual Brew", null, 40),
+      kopi("Cappuccino", 35, 45, { milk: true, image: img("cappuccino") }),
+      kopi("Caffe Latte", 34, 45, { milk: true, desc: "Double shot espresso with fresh milk.", image: img("latte-art") }),
+      kopi("Piccolo", 28, null, { milk: true }),
+      kopi("Cortado", 28, null, { milk: true }),
+      kopi("Flat White", 45, null, { milk: true }),
+      kopi("Caramel Latte", 40, 48, { milk: true }),
+      kopi("Hazelnut Latte", 40, 48, { milk: true }),
+      kopi("Mochaccino", 40, 48, { milk: true }),
+      kopi("Iced Cocopandan Latte", null, 48, { milk: true }),
+      kopi("Iced Vanilla Latte", null, 48, { milk: true }),
+      kopi("Iced Coconut Latte", null, 48, { milk: true }),
     ],
   },
   {
-    name: "Matcha",
+    name: "Non Coffee",
+    icon: "🍫",
+    items: [
+      nonKopi("Chocolate", 38, 42),
+      nonKopi("Matcha", 40, 45, { emoji: "🍵" }),
+      nonKopi("Red Velvet", 40, 45, { emoji: "❤️", image: img("red-velvet") }),
+      dish("Ginger Honey Lemon", 50, "Disajikan hangat.", "🫚"),
+    ],
+  },
+  {
+    name: "Frappe",
+    icon: "🥤",
+    items: [
+      frappe("Avocado Oreo Frappe", 55),
+      frappe("Avocado Coffee Oreo Frappe", 60),
+      frappe("Vanilla Marie Frappe", 55),
+      frappe("Red Velvet Frappe", 55),
+      frappe("Choco Frappe", 55),
+      frappe("Matcha Frappe", 55, { image: img("frappe") }),
+      frappe("Salted Caramel Frappe", 55),
+    ],
+  },
+  {
+    name: "Tea",
     icon: "🍵",
     items: [
-      matcha("Matcha Kinako", 47, "Matcha cold-whisked dengan oat milk dan kinako.", { featured: true }),
-      matcha("Matcha Berry", 49, "Matcha cold-whisked dengan oat milk dan saus berry.", { featured: true }),
-      matcha("Matcha Latte", 45, "Matcha cold-whisked dengan oat milk.", { image: img("matcha-latte") }),
-      matcha("Matcha Corn Tea", 47, "Matcha cold-whisked dengan oat milk dan teh jagung.", { image: img("matcha-corn-tea") }),
-      matcha("Dirty Matcha", 49, "Matcha latte dengan satu shot espresso."),
-      { name: "Hojicha Latte", emoji: "🍵", price: 45 * K, desc: "Teh hijau sangrai dengan oat milk, disajikan dingin.", groups: [manis] },
+      dish("Iced Tea", 30, "", "🧊"),
+      dish("Green Tea", 40, "Disajikan hangat.", "🍵"),
+      dish("Chamomile", 40, "Disajikan hangat.", "🌼"),
+      dish("English Breakfast", 40, "Disajikan hangat.", "🫖"),
+      dish("Lychee Tea", 40, "Disajikan dingin.", "🧋"),
     ],
   },
   {
-    name: "Non-Coffee",
-    icon: "🧋",
+    name: "Mocktail",
+    icon: "🍹",
     items: [
-      { name: "Es Teh Tarik", featured: true, emoji: "🧋", price: 32 * K, desc: "Teh susu tarik dingin.", groups: [manis] },
-      { name: "Es Sonkit", featured: true, emoji: "🍋", price: 22 * K, desc: "Jeruk sonkit segar dengan es." },
-      { name: "Earl Grey Latte", emoji: "🫖", price: 37 * K, desc: "Earl grey dengan susu, disajikan dingin.", groups: [manis] },
-      { name: "Chai Latte", emoji: "🫖", price: 35 * K, desc: "Teh rempah dengan susu, disajikan dingin.", groups: [manis] },
-      { name: "Earl Grey Lychee Tea", emoji: "🍹", price: 35 * K, desc: "Earl grey dingin dengan leci." },
-      { name: "Teh Tawar", emoji: "🍵", price: 13 * K, desc: "Teh tanpa gula.", groups: [suhu(13, 15)] },
-      { name: "Teh Manis", emoji: "🍵", price: 15 * K, desc: "Teh dengan gula.", groups: [suhu(15, 17)] },
+      dish("Lychee Lemonade", 55, "Chia seeds, apple juice, lemonade syrup, lychee syrup.", "🍹", { featured: true, image: img("lychee-lemonade") }),
+      dish("Strawberry Mojito", 50, "Soda, strawberry syrup, lime, mint.", "🍓", { image: img("mojito") }),
+      dish("Virgin Mojito", 50, "Soda, lime, mint.", "🌿"),
+      dish("Passion Soda", 55, "Passion fruit syrup, soda, lime, mint.", "🥤", { image: img("passion-soda") }),
     ],
   },
   {
-    name: "All Day Breakfast",
-    icon: "🍞",
+    name: "Mineral Water",
+    icon: "💧",
+    items: [dish("Equil Sparkling", 45, "", "💧"), dish("Equil Still", 40, "", "💧")],
+  },
+  {
+    name: "Breakfast",
+    icon: "🍳",
     items: [
-      { name: "Roti Cocol", emoji: "🍞", price: 30 * K, desc: "Roti kukus atau bakar dengan satu cocolan pilihanmu.", featured: true, image: img("roti-cocol"), groups: [roti, cocolan, ekstraCocolan] },
-      { name: "Soft Boiled Egg", emoji: "🥚", price: 10 * K, desc: "Telur setengah matang, teman roti cocol.", groups: [telur] },
+      dish("Big Breakfast", 145, "Sausage, beef bacon, sunny side up egg, mushroom, hash brown, salad and toast.", "🍳", { featured: true, image: img("big-breakfast") }),
+      dish("Egg Benedict Smoked Salmon", 145, "Muffins, egg, smoked salmon with salad.", "🥚", { image: img("egg-benedict") }),
+      dish("Cheese Omelette", 95, "Egg and cheese with salad.", "🧀", { image: img("cheese-omelette") }),
+      dish("Toast Bread with Pandan Kaya", 75, "", "🍞"),
+      dish("Boiled Egg with Toast Bread Pandan Kaya", 95, "", "🍞"),
+      dish("Chicken Caesar Salad", 110, "Mixed greens, grilled chicken, croutons, country salad dressing with anchovies.", "🥗"),
     ],
   },
   {
-    name: "Light Bites",
-    icon: "🍢",
-    items: [
-      { name: "Tahu Rempah", emoji: "🍢", price: 27 * K, desc: "Tahu goreng berbalut bumbu rempah.", featured: true, image: img("tahu-rempah") },
-      { name: "Singkong Goreng Cabe Ijo", emoji: "🌶️", price: 32 * K, desc: "Singkong goreng dengan sambal cabe ijo. Pedas, mengandung ketumbar.", image: img("singkong-cabe-ijo") },
-      { name: "Pisang Goreng Kaya", emoji: "🍌", price: 34 * K, desc: "Pisang goreng renyah dengan cocolan kaya.", image: img("pisang-goreng-kaya") },
-      { name: "Chicken Bites", emoji: "🍗", price: 43 * K, desc: "Ayam goreng potong dengan spicy peanut sauce. Pedas, mengandung kacang.", image: img("chicken-bites") },
-    ],
-  },
-  {
-    name: "Main",
-    icon: "🍚",
-    items: [
-      { name: "Classic Gua Bao", emoji: "🥙", price: 57 * K, desc: "Bao kukus isi pork, acar, dan daun ketumbar. Mengandung pork dan kacang.", featured: true, image: img("gua-bao") },
-      { name: "Thai Sauce Rice with Egg", emoji: "🍳", price: 50 * K, desc: "Nasi dengan saus thai dan telur mata sapi. Pilih chicken atau pork.", image: img("thai-sauce-rice"), groups: [protein] },
-      { name: "Nashville Chicken Bao", emoji: "🥙", price: 53 * K, desc: "Bao kukus isi ayam nashville. Pedas, mengandung kacang." },
-      { name: "Beef Pad Kra Pao with Egg", emoji: "🍛", price: 55 * K, desc: "Daging sapi cincang tumis basil dengan nasi dan telur.", groups: [pedas] },
-    ],
-  },
-  {
-    name: "Bakery",
+    name: "Pastry & Dessert",
     icon: "🥐",
     items: [
-      { name: "Salt Bread Original", emoji: "🥐", price: 17 * K, desc: "Roti mentega asin, renyah di luar dan lembut di dalam.", image: img("salt-bread") },
-      { name: "Salt Bread Garlic", emoji: "🧄", price: 20 * K, desc: "Salt bread dengan mentega bawang putih." },
-      { name: "Salted Choco Krisp", emoji: "🍫", price: 27 * K, desc: "Salt bread cokelat dengan topping renyah.", featured: true },
-      { name: "Egg & Cheese Mayo", featured: true, emoji: "🧀", price: 27 * K, desc: "Salt bread isi telur dan keju mayo.", image: img("egg-cheese-mayo") },
-      { name: "Pistachio Cream", emoji: "🥐", price: 30 * K, desc: "Salt bread isi krim pistachio." },
-      { name: "Tuna Mayo", emoji: "🐟", price: 30 * K, desc: "Salt bread isi tuna mayo." },
-      { name: "Blueberry Cream Cheese", emoji: "🫐", price: 30 * K, desc: "Salt bread isi blueberry dan cream cheese." },
-      { name: "Mini Salt Bread (10 pcs)", emoji: "🥐", price: 60 * K, desc: "Sepuluh salt bread mini untuk berbagi." },
+      dish("Butter Croissant", 30, "", "🥐", { image: img("croissant") }),
+      dish("Pain au Chocolate", 45, "", "🥐"),
+      dish("Almond Croissant", 45, "", "🥐"),
+      dish("Cheese Cake", 60, "", "🍰"),
+      dish("Chocolate Cake", 60, "", "🍫"),
+      dish("Moca Cake", 60, "", "🍰"),
+      dish("Tiramisu Cake", 60, "", "🍮"),
+      dish("Rujak Buah", 80, "Mixed fruits.", "🍉"),
     ],
   },
   {
-    name: "Dessert",
-    icon: "🍰",
+    name: "Pasta",
+    icon: "🍝",
     items: [
-      { name: "Basque No. 5", emoji: "🍰", price: 68 * K, desc: "Basque cheesecake andalan Warm Hour.", featured: true, image: img("basque-no5") },
-      { name: "Original Basque Cheese Cake", emoji: "🍰", price: 55 * K, desc: "Basque cheesecake klasik dengan permukaan karamel." },
-      { name: "Choco Berry Basque Cheese Cake", emoji: "🍫", price: 58 * K, desc: "Basque cheesecake cokelat dengan berry." },
-      { name: "Tiramisu", emoji: "🍮", price: 65 * K, desc: "Mascarpone, kopi, dan kakao." },
-      { name: "Carrot Cake Slice", emoji: "🥕", price: 60 * K, desc: "Carrot cake dengan cream cheese frosting." },
-      { name: "Blackforest Cake Slice", featured: true, emoji: "🍒", price: 60 * K, desc: "Kue cokelat berlapis krim dan ceri.", image: img("blackforest") },
+      dish("Crispy Salmon Fettuccine Pesto", 170, "Fettuccine in basil pesto sauce with crispy grilled salmon.", "🍝", { featured: true, image: img("salmon-pesto") }),
+      dish("Spaghetti Marinara Seafood", 165, "Spaghetti in marinara sauce with mussel, squid, and shrimp.", "🍝", { image: img("marinara-seafood") }),
+      dish("Spaghetti Aglio Olio with Prawn", 145, "Spaghetti with garlic, olive oil, chili flakes, sautéed prawn, and cherry tomatoes.", "🍤", { image: img("aglio-olio-prawn") }),
+      dish("Spaghetti Aglio Olio", 90, "Spaghetti with garlic, olive oil, chili flakes, and cherry tomatoes.", "🍝"),
+      dish("Spaghetti Aglio Olio with Basil", 95, "Spaghetti with garlic, olive oil, chili flakes, basil, and cherry tomatoes.", "🌿"),
+      dish("Fettuccine Alfredo Mushroom", 100, "Fettuccine in creamy Alfredo sauce with sauteed mushroom and sliced beef bacon.", "🍄"),
+      dish("Spaghetti Bolognese", 95, "Spaghetti with slow-cooked minced beef Bolognese sauce.", "🍝"),
+    ],
+  },
+  {
+    name: "Western",
+    icon: "🥩",
+    items: [
+      dish("Tenderloin Steak", 295, "Australian prime beef 200 gr.", "🥩", { image: img("tenderloin-steak") }),
+      dish("Sirloin Steak", 210, "200 gr Australian prime steak served with french fries, garden salad, and choice of sauce.", "🥩", { image: img("sirloin-steak"), groups: [sausSteak] }),
+      dish("Salmon Steak", 220, "200 gr grilled salmon steak with creamy sauce, french fries, and garden salad.", "🐟"),
+      dish("Chicken Creamy Mushroom", 130, "Grilled chicken with creamy mushrooms, french fries, and garden salad.", "🍗", { image: img("chicken-mushroom") }),
+    ],
+  },
+  {
+    name: "Soup",
+    icon: "🥣",
+    items: [
+      dish("Mushroom Soup", 80, "Creamy mushroom soup with chives.", "🍄"),
+      dish("Asparagus Soup", 80, "Chicken broth soup with minced chicken, silky egg white, and asparagus.", "🥣"),
+      dish("Corn Soup", 80, "Chicken broth soup with minced chicken, silky egg white and sweet corn.", "🌽", { image: img("corn-soup") }),
+    ],
+  },
+  {
+    name: "Rice",
+    icon: "🍚",
+    items: [
+      dish("Nasi Goreng Amalgam", 125, "Our signature Indonesian fried rice served with Ayam Goreng Kalasan, egg, prawn crackers, and pickled vegetables.", "🍛", { image: img("nasi-goreng") }),
+      dish("Nasi Campur Bali", 115, "Steamed rice with shredded chicken, satay lilit, crispy chicken skin, vegetables, Balado egg, Balado anchovies & peanuts, and sambal matah.", "🍛", { featured: true, image: img("nasi-campur-bali") }),
+      dish("Nasi Gila", 90, "Indonesian-style rice with a mix of sliced chicken, beef sausage, meatballs, egg, and vegetables.", "🍚"),
+      dish("Nasi Goreng Teri Medan", 95, "Indonesian fried rice with crispy Medan anchovies, served with egg and prawn crackers.", "🍛"),
+      dish("Nasi Goreng Seafood", 125, "Indonesian fried rice with prawns, squid, and fish ball, served with egg and prawn crackers.", "🍤"),
+      dish("Nasi Goreng Jambal", 95, "Indonesian fried rice with salted Jambal fish, served with egg and prawn crackers.", "🍛"),
+      dish("Nasi Goreng Buntut", 210, "Indonesian fried rice with tender slow-cooked oxtail, and prawn crackers.", "🍛"),
+      dish("Chicken Rice Curry Katsu", 95, "Crispy chicken katsu over steamed rice with Japanese curry, carrots, and potatoes.", "🍛"),
+    ],
+  },
+  {
+    name: "Noodle",
+    icon: "🍜",
+    items: [
+      dish("Mie Goreng Seafood Indochina Style", 115, "Stir-fried noodles with prawns, squid, and fish ball in an Indochina-style sauce.", "🍜"),
+      dish("Mie Goreng Ayam Indochina Style", 95, "Stir-fried noodles with chicken in an Indochina-style sauce, served with a sunny side up egg.", "🍜"),
+      dish("Kwetiaw Goreng Seafood Indochina Style", 115, "Wok-fried flat rice noodles with prawns, squid, and fish ball in an Indochina-style sauce.", "🍜"),
+      dish("Kwetiaw Goreng Ayam Indochina Style", 95, "Wok-fried flat rice noodles with chicken in an Indochina-style sauce.", "🍜"),
+      dish("Bihun Goreng Seafood Indochina Style", 115, "Stir-fried rice vermicelli with prawns, squid, and fish ball in an Indochina-style sauce.", "🍜"),
+      dish("Bihun Kuah Seafood Indochina Style", 115, "Rice vermicelli in an Indochina-style broth with prawns, squid, and fish ball.", "🍲"),
+      dish("Bihun Goreng Ayam Indochina Style", 95, "Stir-fried rice vermicelli with chicken in an Indochina-style sauce, served with a sunny side up egg.", "🍜"),
+      dish("Japanese Style Ramen", 75, "Japanese-style ramen with Bok Choy, mushroom, seaweed, boiled egg, bean sprouts, and prawns in a savory broth.", "🍜"),
+      dish("Udon Curry Katsu", 95, "Udon noodles served with crispy chicken katsu, Japanese curry sauce, carrots, and potatoes.", "🍛"),
+    ],
+  },
+  {
+    name: "Nusantara",
+    icon: "🍲",
+    items: [
+      dish("Iga Bakar", 195, "Tender grilled beef ribs glazed with our signature sweet and savory sauce, served with steamed rice and fresh vegetables.", "🍖", { image: img("iga-bakar") }),
+      dish("Iga Bakar Lada Hitam", 215, "Grilled beef ribs coated in black pepper sauce, served with steamed rice and fresh vegetables.", "🍖"),
+      dish("Sop Buntut", 195, "Slow-cooked oxtail soup with vegetables in a clear broth, served with steamed rice and fresh vegetables.", "🍲", { image: img("sop-buntut") }),
+      dish("Sop Buntut Bakar", 205, "Grilled oxtail served with clear beef broth, steamed rice and seasonal vegetables.", "🍲"),
+      dish("Buntut Bakar Lada Hitam", 210, "Grilled oxtail in black pepper sauce, served with steamed rice and seasonal vegetables.", "🍖"),
+      dish("Soto Daging Bandung", 105, "Bandung-style beef soup with tender beef, white radish, crispy fried soybeans, and a clear aromatic broth.", "🍲"),
+      dish("Laksa Seafood", 150, "Laksa broth with prawns, squid, fish ball, tofu, bean sprouts, long beans and noodles, finished with fresh herbs.", "🍜"),
+      dish("Dori Sambal Matah", 105, "Crispy dory fillet served with fresh Balinese sambal matah and seasonal vegetables.", "🐟", { image: img("dori-sambal-matah") }),
+      dish("Bebek Crispy Sambal Matah", 115, "Crispy fried duck served with fresh sambal matah, fried tempeh, and seasonal vegetables.", "🦆"),
+      dish("White Rice", 15, "", "🍚"),
+    ],
+  },
+  {
+    name: "Seafood",
+    icon: "🦐",
+    items: [
+      dish("Seafood Tumpah Mix (up to 4 pax)", 450, "Crab, green scallops, mussels, shrimp, squid, and sweet corn, cooked in our signature spicy and savory sauce.", "🦀", { featured: true, image: img("seafood-tumpah") }),
+      dish("Udang Saus Padang", 230, "Cooked in spicy and savory Padang-style sauce.", "🦐"),
+      dish("Udang Saus Singapore", 230, "Cooked in Singapore-style sweet, savory, and mildly spicy sauce.", "🦐"),
+      dish("Udang Lada Hitam", 230, "Cooked in black pepper sauce.", "🦐", { image: img("udang-lada-hitam") }),
+      dish("Udang Saus Mentega", 230, "Cooked in butter sauce.", "🦐"),
+      dish("Udang Garlic Steam Saus Hongkong", 230, "Steamed shrimp in Hongkong-style sauce with steamed egg white and rice vermicelli.", "🦐"),
+      dish("Udang Bakar Madu", 230, "Grilled shrimp served with honey sauce.", "🦐"),
+      dish("Cumi Saus Padang (250 gr)", 120, "Cooked in spicy and savory Padang-style sauce.", "🦑"),
+      dish("Cumi Saus Singapore (250 gr)", 120, "Cooked in Singapore-style sweet, savory, and mildly spicy sauce.", "🦑"),
+      dish("Cumi Lada Hitam (250 gr)", 120, "Cooked in black pepper sauce.", "🦑"),
+      dish("Cumi Telur Asin (170 gr)", 150, "Squid coated in a rich, creamy salted egg yolk sauce.", "🦑"),
+      dish("Cumi Bakar Madu (125 gr)", 68, "Grilled squid served with honey sauce.", "🦑", { image: img("cumi-bakar-madu") }),
+      dish("Kerang Hijau Saus Singapore (250 gr)", 110, "Green scallops cooked in Singapore-style sweet, savory, and mildly spicy sauce.", "🦪"),
+      dish("Kerang Kepah Saus Padang (250 gr)", 110, "Green scallops cooked in spicy and savory Padang-style sauce.", "🦪"),
+      dish("Kerang Batik Saus Padang (250 gr)", 95, "Batik mussels cooked in spicy and savory Padang-style sauce.", "🦪", { image: img("kerang-batik") }),
+      dish("Kerang Batik Saus Singapore (250 gr)", 95, "Batik mussels cooked in Singapore-style sweet, savory, and mildly spicy sauce.", "🦪"),
+      dish("Kerang Dara Saus Padang (250 gr)", 95, "Dara mussels cooked in spicy and savory Padang-style sauce.", "🦪"),
+      dish("Kerang Dara Saus Singapore (250 gr)", 95, "Dara mussels cooked in Singapore-style sweet, savory, and mildly spicy sauce.", "🦪"),
+      dish("Ikan Gurame Goreng Asam Manis (500 gr)", 198, "Sweet and sour fried carp.", "🐟"),
+      dish("Ikan Gurame Goreng Telur Asin (500 gr)", 198, "Salted egg fried carp.", "🐟"),
+      dish("Ikan Gurame Goreng Bumbu Rujak (500 gr)", 198, "Deep fried carp with fruit salad.", "🐟"),
+      dish("Ikan Gurame Goreng Saus Mangga (500 gr)", 198, "Deep fried carp with mango sauce.", "🐟", { image: img("gurame") }),
+    ],
+  },
+  {
+    name: "Veggies",
+    icon: "🥦",
+    items: [
+      dish("Toge Garlic", 70, "Stir-fried bean sprouts with garlic.", "🌱", { image: img("toge") }),
+      dish("Toge Ikan Asin Jambal", 85, "Stir-fried bean sprouts with traditional dried salted fish.", "🌱"),
+      dish("Mixed Vegetables", 95, "Broccoli, cauliflower, and assorted mushrooms wok-tossed in a savory oyster sauce.", "🥦"),
+      dish("Pocay 2 Rasa", 85, "Sautéed Bok Choy with scrambled egg and creamy salted egg yolk sauce.", "🥬"),
+      dish("Brokoli Garlic", 70, "Broccoli with minced garlic.", "🥦"),
+      dish("Brokoli Jamur Hitam", 85, "Broccoli with black mushroom.", "🥦", { image: img("brokoli-jamur") }),
+      dish("Brokoli Tumis Seafood", 115, "Sautéed broccoli with seafood and carrots.", "🥦"),
+      dish("Baby Kailan Garlic", 70, "Sautéed baby kailan with garlic.", "🥬", { image: img("kailan") }),
+      dish("Baby Kailan 2 Rasa", 85, "Sautéed baby kailan with Balado and garlic sauce.", "🥬"),
+      dish("Kangkung Garlic", 70, "Stir-fried water spinach with garlic.", "🥬"),
+      dish("Kangkung Balacan", 85, "Stir-fried water spinach with traditional shrimp paste.", "🥬", { image: img("kangkung") }),
+      dish("Baby Buncis Garlic", 70, "Baby green beans sautéed with garlic.", "🫛"),
+      dish("Baby Buncis Cabe Garam", 85, "Baby green beans stir-fried with chili salt.", "🫛"),
+      dish("Baby Buncis Telur Asin", 85, "Baby green beans tossed in a rich, creamy salted egg yolk sauce.", "🫛", { image: img("buncis-telur-asin") }),
+    ],
+  },
+  {
+    name: "Beef, Chicken & Tofu",
+    icon: "🍗",
+    items: [
+      dish("Sapi Lada Hitam", 210, "Sliced beef in a black pepper sauce with onions and bell peppers.", "🥩"),
+      dish("Ayam Goreng Telur Asin", 165, "Fried chicken coated in a rich, creamy salted egg yolk sauce.", "🍗"),
+      dish("Ayam Goreng Cabe Garam", 165, "Fried chicken with garlic, chili, and savory seasoning.", "🍗"),
+      dish("Ayam Goreng Mentega", 165, "Chicken sautéed in a rich butter sauce with garlic and onions.", "🍗"),
+      dish("Ayam Goreng Saus Mangga", 165, "Chicken served with a sweet and tangy mango sauce.", "🍗"),
+      dish("Mun Tahu", 110, "Silky soft tofu braised with shiitake mushrooms and minced chicken in a savory gravy.", "🍢"),
+      dish("Tahu Telur Asin", 110, "Silky soft tofu covered in salted egg and sprinkled with chopped Bok Choy.", "🍢"),
+      dish("Tahu Telur Shimeji", 130, "Soft tofu coated with spinach and drizzled in a thick sauce with shimeji mushroom.", "🍢"),
+      dish("Mapo Tofu", 110, "Minced meat stir fried tofu with spicy savory taste.", "🌶️"),
+    ],
+  },
+  {
+    name: "Snack",
+    icon: "🍟",
+    items: [
+      dish("Mix Platter", 140, "BBQ chicken wings, french fries, chicken skin, mini wonton, sausages.", "🍟", { image: img("mix-platter") }),
+      dish("French Fries with Homemade Cheese Sauce", 85, "", "🍟", { image: img("fries-cheese") }),
+      dish("Spicy Garlic Chicken Wings", 105, "", "🍗"),
+      dish("Spicy Beef Nachos", 110, "", "🌮"),
+      dish("Fried Banana with Cheese", 85, "Served with vanilla ice cream.", "🍌"),
+      dish("Chocolate Cheese Grilled Banana", 85, "", "🍌"),
+      dish("Fried Cassava", 85, "", "🍠"),
+      dish("Lupis", 85, "", "🍡"),
+      dish("Bala Bala", 85, "", "🥟"),
+      dish("Perkedel Jagung", 85, "", "🌽"),
+      dish("Tahu Cabe Garam", 85, "", "🌶️"),
+      dish("Chicken Skin", 95, "", "🍗"),
+      dish("Mini Wonton", 95, "", "🥟"),
     ],
   },
 ];
@@ -189,19 +354,21 @@ async function main() {
   console.log("🏪 Outlet & meja…");
   const kemang = await db.outlet.create({
     data: {
-      name: "Warm Hour Cafe",
-      slug: "warm-hour",
-      address: "No.11 Blok A1, Jl. KH. Moh. Mansyur, Duri Pulo, Gambir, Jakarta Pusat",
-      phone: "0852-8262-3535",
+      name: "Amalgam Coffee",
+      slug: "amalgam",
+      address: "Jl. Kebon Sirih No.39, Kebon Sirih, Menteng, Jakarta Pusat 10340",
+      phone: "0819-3240-0777",
+      // Buku menu: harga belum termasuk pajak & service. Sesuaikan persentasenya di Pengaturan outlet.
       taxRate: 10,
-      serviceRate: 0,
-      receiptFooter: "Thank you for visiting Warm Hour. See you any other hour! IG @cafe_by_warmhour",
+      serviceRate: 5,
+      receiptFooter: "Thank you for slowing down with us. See you again at Amalgam! IG @amalgam.kebonsirih",
     },
   });
 
   const tableDefs = [
-    ...Array.from({ length: 10 }, (_, i) => ({ name: `Meja ${String(i + 1).padStart(2, "0")}`, area: "Indoor", capacity: i < 6 ? 2 : 4 })),
-    ...Array.from({ length: 3 }, (_, i) => ({ name: `Teras ${i + 1}`, area: "Teras", capacity: 2 })),
+    ...Array.from({ length: 12 }, (_, i) => ({ name: `Meja ${String(i + 1).padStart(2, "0")}`, area: "Indoor", capacity: i < 6 ? 2 : 4 })),
+    ...Array.from({ length: 4 }, (_, i) => ({ name: `Teras ${i + 1}`, area: "Teras", capacity: 4 })),
+    { name: "Private Room", area: "Private Room", capacity: 10 },
   ];
   const kemangTables = [];
   for (const [i, t] of tableDefs.entries()) {
@@ -217,7 +384,7 @@ async function main() {
         data: {
           categoryId: category.id,
           name: item.name,
-          description: item.desc,
+          description: item.desc || null,
           emoji: item.emoji,
           imageUrl: item.image,
           price: item.price,
@@ -245,7 +412,7 @@ async function main() {
     }
   }
   // Contoh stok habis
-  const habis = allProducts.find((p) => p.name === "Pistachio Cream")!;
+  const habis = allProducts.find((p) => p.name === "Almond Croissant")!;
   await db.productUnavailable.create({ data: { outletId: kemang.id, productId: habis.id } });
 
   console.log("👤 Akun staf…");
@@ -273,9 +440,9 @@ async function main() {
       const day = new Date();
       day.setDate(day.getDate() - daysAgo);
       const open = new Date(day);
-      open.setHours(7, 30, 0, 0);
+      open.setHours(7, 0, 0, 0);
       const close = new Date(day);
-      close.setHours(21, 0, 0, 0);
+      close.setHours(22, 0, 0, 0);
       const shift = await db.shift.create({
         data: { outletId: outlet.id, userId: cashierId, openedAt: open, closedAt: close, openingCash: 500000 },
       });
@@ -284,7 +451,7 @@ async function main() {
       let cashTotal = 0;
       for (let n = 1; n <= count; n++) {
         const createdAt = new Date(day);
-        const hour = pick([8, 8, 9, 9, 10, 10, 11, 12, 12, 13, 14, 15, 15, 16, 16, 17, 18, 19, 20]);
+        const hour = pick([7, 8, 9, 9, 10, 11, 12, 12, 12, 13, 13, 14, 15, 16, 17, 18, 18, 19, 19, 20, 21]);
         createdAt.setHours(hour, randInt(0, 59), randInt(0, 59), 0);
         const done = new Date(createdAt.getTime() + randInt(12, 35) * 60000);
         const lineCount = randInt(1, 4);

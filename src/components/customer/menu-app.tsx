@@ -334,7 +334,7 @@ export function MenuApp({
           <input
             value={query}
             onChange={(e) => setQuery(e.target.value)}
-            placeholder="Cari kopi, matcha, roti…"
+            placeholder="Cari kopi, pasta, nasi goreng…"
             aria-label="Cari menu"
             className="h-12 w-full rounded-full border bg-card pl-11 pr-11 text-[15px] outline-none transition placeholder:text-muted-foreground/80 focus:border-primary focus:ring-4 focus:ring-primary/10"
           />

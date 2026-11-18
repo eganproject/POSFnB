@@ -35,7 +35,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
           <span className="font-display text-3xl leading-none tracking-wide">{BRAND.shortName}</span>
         </div>
         <div className="relative space-y-6">
-          <h1 className="max-w-md font-display text-5xl leading-[1.05]">Selamat bertugas di Warm Hour.</h1>
+          <h1 className="max-w-md font-display text-5xl leading-[1.05]">Selamat bertugas di {BRAND.shortName}.</h1>
           <ul className="space-y-3 text-cream/85">
             {[
               "Tamu pesan & bayar sendiri lewat QR meja",
