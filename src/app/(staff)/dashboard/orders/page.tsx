@@ -9,7 +9,11 @@ import { OrdersBoard, type BoardOrder } from "./orders-board";
 export const metadata = { title: "Pesanan" };
 export const dynamic = "force-dynamic";
 
-const FILTERS: Record<string, Prisma.OrderWhereInput> = {
+type TabKey = "action" | "active" | "unpaid" | "done" | "cancelled" | "all";
+const TAB_KEYS: TabKey[] = ["action", "active", "unpaid", "done", "cancelled", "all"];
+const LIVE_TABS = new Set<TabKey>(["action", "active", "unpaid"]);
+
+const FILTERS: Record<TabKey, Prisma.OrderWhereInput> = {
   action: { status: "PENDING" },
   active: { status: { in: ["CONFIRMED", "PREPARING", "READY"] } },
   unpaid: { paymentStatus: { in: ["UNPAID", "PARTIAL"] }, status: { not: "CANCELLED" } },
@@ -22,17 +26,22 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
   const user = await requireUser(["OWNER", "KASIR", "PELAYAN"]);
   const outlet = await requireOutlet();
   const sp = await searchParams;
-  const tab = sp.tab && sp.tab in FILTERS ? sp.tab : "active";
+  const tab: TabKey = sp.tab && (TAB_KEYS as string[]).includes(sp.tab) ? (sp.tab as TabKey) : "active";
   const date = sp.date || businessDate();
   const q = sp.q?.trim();
   await expireStaleOrders(outlet.id);
 
-  const base: Prisma.OrderWhereInput = {
+  const search: Prisma.OrderWhereInput = q
+    ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { customerName: { contains: q, mode: "insensitive" } }] }
+    : {};
+  // Filter yang sama dipakai untuk daftar & badge jumlah tiap tab
+  const whereFor = (key: TabKey): Prisma.OrderWhereInput => ({
     outletId: outlet.id,
     // Pesanan aktif/menunggu tampil walau dari hari sebelumnya
-    ...(tab === "action" || tab === "active" || tab === "unpaid" ? {} : { businessDate: date }),
-    ...(q ? { OR: [{ code: { contains: q, mode: "insensitive" } }, { customerName: { contains: q, mode: "insensitive" } }] } : {}),
-  };
+    ...(LIVE_TABS.has(key) ? {} : { businessDate: date }),
+    ...search,
+    ...FILTERS[key],
+  });
 
   const include = {
     table: { select: { name: true } },
@@ -40,10 +49,8 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     payments: { where: { state: "SUCCESS" as const } },
   };
   const [orders, counts, requests, selected] = await Promise.all([
-    db.order.findMany({ where: { ...base, ...FILTERS[tab] }, include, orderBy: { createdAt: tab === "active" || tab === "action" ? "asc" : "desc" }, take: 120 }),
-    Promise.all(
-      (["action", "active", "unpaid"] as const).map((k) => db.order.count({ where: { outletId: outlet.id, ...FILTERS[k] } }))
-    ),
+    db.order.findMany({ where: whereFor(tab), include, orderBy: { createdAt: tab === "active" || tab === "action" ? "asc" : "desc" }, take: 120 }),
+    Promise.all(TAB_KEYS.map((k) => db.order.count({ where: whereFor(k) }))),
     db.serviceRequest.findMany({ where: { outletId: outlet.id, resolvedAt: null }, include: { table: { select: { name: true } } }, orderBy: { createdAt: "asc" } }),
     sp.id ? db.order.findFirst({ where: { id: sp.id, outletId: outlet.id }, include: { ...include, payments: { orderBy: { createdAt: "asc" as const } } } }) : null,
   ]);
@@ -80,7 +87,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
         q={q ?? ""}
         date={date}
         role={user.role}
-        counts={{ action: counts[0], active: counts[1], unpaid: counts[2] }}
+        counts={Object.fromEntries(TAB_KEYS.map((k, i) => [k, counts[i]]))}
         orders={orders.map(map)}
         selected={selected ? map(selected) : null}
         requests={requests.map((r) => ({ id: r.id, type: r.type, tableName: r.table.name, createdAt: r.createdAt.toISOString() }))}
