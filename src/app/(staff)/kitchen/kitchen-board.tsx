@@ -18,6 +18,8 @@ type KOrder = {
   type: OrderType;
   source: OrderSource;
   tableName: string | null;
+  /** Jam ambil takeaway terjadwal, mis. "14:30" */
+  pickupLabel?: string | null;
   customerName: string | null;
   note: string | null;
   since: string;
@@ -174,7 +176,7 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
       <div className={cn("flex items-center justify-between px-4 py-3", urgency === "late" ? "bg-destructive/20" : urgency === "warn" ? "bg-warning/15" : "bg-muted/60")}>
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-black tabular">#{pad(o.queueNumber)}</span>
-          <span className="font-semibold">{o.tableName ?? "Takeaway"}</span>
+          <span className="font-semibold">{o.tableName ?? (o.pickupLabel ? `Takeaway · ambil ${o.pickupLabel}` : "Takeaway")}</span>
         </div>
         <div className="text-right">
           <p className={cn("text-lg font-bold tabular", urgency === "late" && "text-destructive")}>{minutes}′</p>

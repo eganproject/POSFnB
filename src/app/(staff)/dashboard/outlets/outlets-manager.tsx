@@ -10,16 +10,18 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "
 import { Switch } from "@/components/ui/misc";
 import { saveOutlet } from "@/server/actions/admin";
 
-type O = { id?: string; name: string; slug: string; address: string | null; phone: string | null; taxRate: number; serviceRate: number; maxDiscountPercent: number; receiptFooter: string | null; isActive: boolean; tables?: number; staff?: number };
+type O = { id?: string; name: string; slug: string; address: string | null; phone: string | null; taxRate: number; serviceRate: number; maxDiscountPercent: number; receiptFooter: string | null; isActive: boolean; takeawayEnabled: boolean; openTime: string; closeTime: string; takeawayLeadMinutes: number; tables?: number; staff?: number };
 
 export function OutletsManager({ outlets }: { outlets: O[] }) {
   const router = useRouter();
   const [edit, setEdit] = useState<O | null>(null);
   const [active, setActive] = useState(true);
+  const [takeaway, setTakeaway] = useState(true);
   const [pending, start] = useTransition();
 
   const open = (o: O) => {
     setActive(o.isActive);
+    setTakeaway(o.takeawayEnabled);
     setEdit(o);
   };
 
@@ -55,13 +57,16 @@ export function OutletsManager({ outlets }: { outlets: O[] }) {
                 </div>
               ))}
             </div>
+            <p className="text-xs text-muted-foreground">
+              Buka {o.openTime}–{o.closeTime} · Takeaway {o.takeawayEnabled ? `aktif (siap ±${o.takeawayLeadMinutes} mnt)` : "nonaktif"}
+            </p>
             <Button variant="outline" className="w-full" onClick={() => open(o)}>
               <Pencil /> Ubah
             </Button>
           </div>
         ))}
         <button
-          onClick={() => open({ name: "", slug: "", address: "", phone: "", taxRate: 10, serviceRate: 0, maxDiscountPercent: 20, receiptFooter: "", isActive: true })}
+          onClick={() => open({ name: "", slug: "", address: "", phone: "", taxRate: 10, serviceRate: 0, maxDiscountPercent: 20, receiptFooter: "", isActive: true, takeawayEnabled: true, openTime: "08:00", closeTime: "22:00", takeawayLeadMinutes: 15 })}
           className="grid min-h-60 place-items-center rounded-2xl border-2 border-dashed text-muted-foreground transition hover:border-primary hover:text-primary"
         >
           <span className="flex flex-col items-center gap-2 font-semibold"><Plus className="size-6" /> Tambah outlet</span>
@@ -88,6 +93,10 @@ export function OutletsManager({ outlets }: { outlets: O[] }) {
                     maxDiscountPercent: Math.round(Number(f.get("maxDiscountPercent")) || 0),
                     receiptFooter: String(f.get("receiptFooter")) || null,
                     isActive: active,
+                    takeawayEnabled: takeaway,
+                    openTime: String(f.get("openTime") || "08:00"),
+                    closeTime: String(f.get("closeTime") || "22:00"),
+                    takeawayLeadMinutes: Number(f.get("takeawayLeadMinutes")) || 15,
                   });
                   if (!r.ok) {
                     toast.error(r.error);
@@ -112,9 +121,21 @@ export function OutletsManager({ outlets }: { outlets: O[] }) {
                 <Field label="Batas diskon kasir (%)" className="col-span-2" hint="Owner tidak dibatasi"><Input name="maxDiscountPercent" type="number" step="1" min={0} max={100} defaultValue={edit.maxDiscountPercent} /></Field>
                 <Field label="Teks bawah struk" className="col-span-2"><Textarea name="receiptFooter" defaultValue={edit.receiptFooter ?? ""} rows={2} /></Field>
               </div>
+              <div className="grid grid-cols-3 gap-3">
+                <Field label="Jam buka"><Input name="openTime" type="time" defaultValue={edit.openTime} required /></Field>
+                <Field label="Jam tutup"><Input name="closeTime" type="time" defaultValue={edit.closeTime} required /></Field>
+                <Field label="Siap (menit)" hint="min. waktu siap"><Input name="takeawayLeadMinutes" type="number" min={5} max={180} defaultValue={edit.takeawayLeadMinutes} /></Field>
+              </div>
               <label className="flex items-center justify-between rounded-xl border p-3 text-sm">
                 Outlet aktif (menerima pesanan QR)
                 <Switch checked={active} onCheckedChange={setActive} />
+              </label>
+              <label className="flex items-center justify-between gap-3 rounded-xl border p-3 text-sm">
+                <span>
+                  Terima pesanan takeaway dari aplikasi
+                  <span className="block text-xs text-muted-foreground">Pelanggan pesan dari rumah, pilih jam ambil di jam buka</span>
+                </span>
+                <Switch checked={takeaway} onCheckedChange={setTakeaway} />
               </label>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setEdit(null)}>Batal</Button>

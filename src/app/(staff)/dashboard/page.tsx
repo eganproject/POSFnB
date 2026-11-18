@@ -39,7 +39,7 @@ export default async function OverviewPage() {
   ]);
   const [refundDue, demoAccounts] = await Promise.all([ordersNeedingRefund(outlet.id), accountsWithDemoPassword()]);
   const warnings = [
-    ...configProblems(),
+    ...(await configProblems()),
     ...(demoAccounts.length
       ? [`${demoAccounts.length} akun masih memakai password demo "password123" (${demoAccounts.join(", ")}). Ganti password atau nonaktifkan di menu Pengguna sebelum online.`]
       : []),

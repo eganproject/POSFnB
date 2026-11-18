@@ -1,5 +1,6 @@
 "use server";
 import { z } from "zod";
+import { pickupLabel } from "@/lib/pickup-label";
 import { revalidatePath } from "next/cache";
 import type { OrderStatus } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -184,7 +185,7 @@ export async function startStaffOnlinePayment(
     const shift = await openShiftFor(user.id, outlet.id);
     if (!shift) throw new OrderError("Buka shift kasir terlebih dahulu.");
     const p = await createGatewayPayment({ orderId, amount, label, shiftId: shift.id, userId: user.id });
-    return { ok: true, data: { paymentId: p.id, token: p.snapToken!, demo: !isMidtransEnabled(), redirectUrl: p.snapRedirectUrl } };
+    return { ok: true, data: { paymentId: p.id, token: p.snapToken!, demo: !(await isMidtransEnabled()), redirectUrl: p.snapRedirectUrl } };
   } catch (e) {
     return fail(e);
   }
@@ -241,6 +242,7 @@ export async function getOrderForPayment(orderId: string) {
     status: o.status,
     paymentStatus: o.paymentStatus,
     tableName: o.table?.name ?? null,
+    pickupLabel: pickupLabel(o.pickupAt),
     customerName: o.customerName,
     customerPhone: o.customerPhone,
     subtotal: o.subtotal,

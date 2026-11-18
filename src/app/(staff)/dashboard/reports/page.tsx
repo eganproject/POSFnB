@@ -160,7 +160,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
   );
 }
 
-const PALETTE = ["bg-primary", "bg-sky-500", "bg-emerald-500", "bg-violet-500", "bg-amber-400"];
+const PALETTE = ["bg-primary", "bg-honey", "bg-emerald-600", "bg-sky-600", "bg-stone-400"];
 
 function Empty() {
   return <p className="py-8 text-center text-sm text-muted-foreground">Belum ada data di periode ini</p>;

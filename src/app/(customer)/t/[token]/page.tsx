@@ -5,6 +5,8 @@ import { getMenuForOutlet } from "@/server/menu";
 import { isOnlinePaymentAvailable } from "@/server/midtrans";
 import { MenuApp } from "@/components/customer/menu-app";
 import { ClosedNotice } from "@/components/customer/closed-notice";
+import { getCurrentCustomer } from "@/lib/session";
+import { isGoogleLoginEnabled } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -21,7 +23,7 @@ export default async function TableMenuPage({ params }: Props) {
   const table = await db.diningTable.findUnique({ where: { qrToken: token }, include: { outlet: true } });
   if (!table) notFound();
   if (!table.isActive || !table.outlet.isActive) return <ClosedNotice name={table.outlet.name} />;
-  const categories = await getMenuForOutlet(table.outletId);
+  const [categories, customer, googleEnabled] = await Promise.all([getMenuForOutlet(table.outletId), getCurrentCustomer(), isGoogleLoginEnabled()]);
   return (
     <MenuApp
       outlet={{
@@ -30,10 +32,12 @@ export default async function TableMenuPage({ params }: Props) {
         address: table.outlet.address,
         taxRate: table.outlet.taxRate,
         serviceRate: table.outlet.serviceRate,
-        onlinePay: isOnlinePaymentAvailable(),
+        onlinePay: await isOnlinePaymentAvailable(),
       }}
       table={{ name: table.name, area: table.area, token: table.qrToken }}
       categories={categories}
+      customer={customer ? { name: customer.name, image: customer.image, phone: customer.phone } : null}
+      googleEnabled={googleEnabled}
     />
   );
 }

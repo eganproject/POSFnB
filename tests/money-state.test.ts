@@ -1,4 +1,12 @@
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+// Key Midtrans dibaca dari Pengaturan/.env; di tes cukup dari .env
+vi.mock("@/server/settings", () => ({
+  getMidtransConfig: async () => {
+    const enabled = Boolean(process.env.MIDTRANS_SERVER_KEY && process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY);
+    return { enabled, serverKey: process.env.MIDTRANS_SERVER_KEY ?? "", clientKey: process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? "", isProduction: false };
+  },
+}));
 import { moneyState } from "@/lib/payment-math";
 import { isDemoPaymentAllowed, isOnlinePaymentAvailable } from "@/server/midtrans";
 
@@ -42,22 +50,22 @@ describe("mode demo pembayaran", () => {
   afterEach(() => {
     process.env = { ...env };
   });
-  it("aktif saat development tanpa key", () => {
+  it("aktif saat development tanpa key", async () => {
     set({ NODE_ENV: "development", MIDTRANS_SERVER_KEY: undefined, NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: undefined, ALLOW_DEMO_PAYMENT: undefined });
-    expect(isDemoPaymentAllowed()).toBe(true);
+    expect(await isDemoPaymentAllowed()).toBe(true);
   });
-  it("mati di produksi tanpa key, dan pembayaran online tidak tersedia", () => {
+  it("mati di produksi tanpa key, dan pembayaran online tidak tersedia", async () => {
     set({ NODE_ENV: "production", MIDTRANS_SERVER_KEY: undefined, NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: undefined, ALLOW_DEMO_PAYMENT: undefined });
-    expect(isDemoPaymentAllowed()).toBe(false);
-    expect(isOnlinePaymentAvailable()).toBe(false);
+    expect(await isDemoPaymentAllowed()).toBe(false);
+    expect(await isOnlinePaymentAvailable()).toBe(false);
   });
-  it("hanya menyala di produksi jika diizinkan eksplisit", () => {
+  it("hanya menyala di produksi jika diizinkan eksplisit", async () => {
     set({ NODE_ENV: "production", MIDTRANS_SERVER_KEY: undefined, NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: undefined, ALLOW_DEMO_PAYMENT: "true" });
-    expect(isDemoPaymentAllowed()).toBe(true);
+    expect(await isDemoPaymentAllowed()).toBe(true);
   });
-  it("mati jika key Midtrans terisi", () => {
+  it("mati jika key Midtrans terisi", async () => {
     set({ NODE_ENV: "development", MIDTRANS_SERVER_KEY: "SB-x", NEXT_PUBLIC_MIDTRANS_CLIENT_KEY: "SB-y" });
-    expect(isDemoPaymentAllowed()).toBe(false);
-    expect(isOnlinePaymentAvailable()).toBe(true);
+    expect(await isDemoPaymentAllowed()).toBe(false);
+    expect(await isOnlinePaymentAvailable()).toBe(true);
   });
 });

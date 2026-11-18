@@ -29,6 +29,8 @@ export type CreateOrderInput = {
   discountReason?: string | null;
   /** Batas diskon (% subtotal). null = tanpa batas (owner) */
   maxDiscountPercent?: number | null;
+  customerId?: string | null;
+  pickupAt?: Date | null;
 };
 
 export async function createOrder(input: CreateOrderInput) {
@@ -74,6 +76,8 @@ export async function createOrder(input: CreateOrderInput) {
             customerPhone: input.customerPhone?.trim() || null,
             note: input.note?.trim() || null,
             cashierId: input.cashierId ?? null,
+            customerId: input.customerId ?? null,
+            pickupAt: input.type === "TAKEAWAY" ? input.pickupAt ?? null : null,
             ...totals,
             discountReason: totals.discount > 0 ? input.discountReason?.trim() || null : null,
             items: {
@@ -364,7 +368,7 @@ export async function createGatewayPayment(opts: {
   shiftId?: string | null;
   userId?: string | null;
 }) {
-  if (!isOnlinePaymentAvailable()) throw new OrderError("Pembayaran online belum aktif. Silakan bayar di kasir.");
+  if (!(await isOnlinePaymentAvailable())) throw new OrderError("Pembayaran online belum aktif. Silakan bayar di kasir.");
   const order = await db.order.findUnique({ where: { id: opts.orderId }, include: { outlet: true, payments: true, refunds: true } });
   if (!order) throw new OrderError("Pesanan tidak ditemukan.");
   if (order.status === "CANCELLED") throw new OrderError("Pesanan sudah dibatalkan.");
@@ -384,7 +388,7 @@ export async function createGatewayPayment(opts: {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   let snapToken = `demo-${randomCode(10)}`;
   let redirectUrl: string | null = null;
-  if (isMidtransEnabled()) {
+  if (await isMidtransEnabled()) {
     const snap = await createSnapTransaction({
       orderId: gatewayOrderId,
       amount,

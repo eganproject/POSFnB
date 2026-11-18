@@ -1,13 +1,15 @@
 import "server-only";
 import { verifyPassword } from "better-auth/crypto";
 import { db } from "@/lib/db";
-import { isDemoPaymentAllowed, isMidtransEnabled } from "@/server/midtrans";
+import { isDemoPaymentAllowed } from "@/server/midtrans";
+import { getMidtransConfig } from "@/server/settings";
 
 export const PLACEHOLDER_SECRETS = ["ganti-dengan-string-acak-minimal-32-karakter", "changeme", "secret"];
 const DEMO_PASSWORD = "password123";
 
 /** Masalah konfigurasi yang berbahaya bila aplikasi dipakai sungguhan / online */
-export function configProblems() {
+export async function configProblems() {
+  const midtrans = await getMidtransConfig();
   const problems: string[] = [];
   const secret = process.env.BETTER_AUTH_SECRET ?? "";
   if (!secret || secret.length < 32 || PLACEHOLDER_SECRETS.includes(secret)) {
@@ -17,14 +19,14 @@ export function configProblems() {
   if (isProd && !(process.env.BETTER_AUTH_URL ?? "").startsWith("https://")) {
     problems.push("BETTER_AUTH_URL belum memakai https:// domain Anda.");
   }
-  if (isProd && isDemoPaymentAllowed()) {
+  if (isProd && (await isDemoPaymentAllowed())) {
     problems.push("Mode demo pembayaran aktif (ALLOW_DEMO_PAYMENT=true). Siapa pun bisa menandai pesanan lunas tanpa membayar.");
   }
-  if (isProd && !isMidtransEnabled()) {
-    problems.push("Key Midtrans belum diisi, jadi pembayaran online customer dimatikan (hanya bayar di kasir).");
+  if (isProd && !midtrans.enabled) {
+    problems.push("Key Midtrans belum diisi (menu Pengaturan atau .env), jadi pembayaran online customer dimatikan (hanya bayar di kasir).");
   }
-  if (isProd && process.env.MIDTRANS_IS_PRODUCTION !== "true" && isMidtransEnabled()) {
-    problems.push("Midtrans masih mode sandbox (MIDTRANS_IS_PRODUCTION bukan true): pembayaran customer tidak sungguhan.");
+  if (isProd && midtrans.enabled && !midtrans.isProduction) {
+    problems.push("Midtrans masih mode sandbox: pembayaran customer tidak sungguhan.");
   }
   return problems;
 }

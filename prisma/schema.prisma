@@ -16,27 +16,32 @@ enum Role {
   KASIR
   DAPUR
   PELAYAN
+  /// Pelanggan yang login Google (daftar sendiri). Tidak punya akses ke dashboard.
+  CUSTOMER
 }
 
 model User {
-  id            String     @id
-  name          String
-  email         String     @unique
-  emailVerified Boolean    @default(false)
-  image         String?
-  role          Role       @default(KASIR)
-  isActive      Boolean    @default(true)
-  outletId      String?
-  outlet        Outlet?    @relation(fields: [outletId], references: [id], onDelete: SetNull)
-  createdAt     DateTime   @default(now())
-  updatedAt     DateTime   @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  shifts        Shift[]
-  orders        Order[]    @relation("OrderCashier")
-  payments      Payment[]
-  refunds       Refund[]   @relation("RefundUser")
-  auditLogs     AuditLog[] @relation("AuditUser")
+  id             String     @id
+  name           String
+  email          String     @unique
+  emailVerified  Boolean    @default(false)
+  image          String?
+  /// Nomor WhatsApp pelanggan (opsional, untuk isi otomatis saat pesan)
+  phone          String?
+  role           Role       @default(CUSTOMER)
+  isActive       Boolean    @default(true)
+  outletId       String?
+  outlet         Outlet?    @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  shifts         Shift[]
+  orders         Order[]    @relation("OrderCashier")
+  customerOrders Order[]    @relation("OrderCustomer")
+  payments       Payment[]
+  refunds        Refund[]   @relation("RefundUser")
+  auditLogs      AuditLog[] @relation("AuditUser")
 
   @@map("user")
 }
@@ -90,21 +95,28 @@ model Verification {
 // ─────────────────────────────────────────────
 
 model Outlet {
-  id                 String   @id @default(cuid())
-  name               String
-  slug               String   @unique
-  address            String?
-  phone              String?
+  id                  String   @id @default(cuid())
+  name                String
+  slug                String   @unique
+  address             String?
+  phone               String?
   /// Persen pajak (PB1), mis. 10 = 10%
-  taxRate            Float    @default(10)
+  taxRate             Float    @default(10)
   /// Persen service charge
-  serviceRate        Float    @default(0)
-  receiptFooter      String?
+  serviceRate         Float    @default(0)
+  receiptFooter       String?
+  isActive            Boolean  @default(true)
   /// Batas diskon (% dari subtotal) yang boleh diberikan kasir. Owner tidak dibatasi.
-  maxDiscountPercent Int      @default(20)
-  isActive           Boolean  @default(true)
-  createdAt          DateTime @default(now())
-  updatedAt          DateTime @updatedAt
+  maxDiscountPercent  Int      @default(20)
+  /// Terima pesanan takeaway dari aplikasi (pesan dari rumah, ambil di outlet)
+  takeawayEnabled     Boolean  @default(true)
+  /// Jam buka & tutup (HH:mm, zona waktu APP_TIMEZONE) untuk slot jam ambil
+  openTime            String   @default("08:00")
+  closeTime           String   @default("22:00")
+  /// Minimal waktu siap (menit) sejak pesanan dibuat
+  takeawayLeadMinutes Int      @default(15)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tables      DiningTable[]
   users       User[]
@@ -280,6 +292,11 @@ model Order {
   total          Int
   cashierId      String?
   cashier        User?          @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  /// Pelanggan yang login saat memesan (untuk riwayat pesanan)
+  customerId     String?
+  customer       User?          @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  /// Jam ambil pesanan takeaway (null = secepatnya)
+  pickupAt       DateTime?
   cancelReason   String?
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
@@ -296,6 +313,7 @@ model Order {
   @@unique([outletId, businessDate, queueNumber])
   @@index([outletId, status])
   @@index([outletId, createdAt])
+  @@index([customerId, createdAt])
 }
 
 model OrderItem {
@@ -423,4 +441,21 @@ model ServiceRequest {
   createdAt  DateTime    @default(now())
 
   @@index([outletId, resolvedAt])
+}
+
+// ─────────────────────────────────────────────
+// Pengaturan aplikasi (diatur owner dari dashboard)
+// ─────────────────────────────────────────────
+
+/// Satu baris saja (id = 1). Kosong = pakai nilai dari .env.
+/// Secret disimpan terenkripsi (AES-256-GCM, kunci dari BETTER_AUTH_SECRET).
+model AppSettings {
+  id                   Int      @id @default(1)
+  midtransServerKey    String?
+  midtransClientKey    String?
+  midtransIsProduction Boolean?
+  googleClientId       String?
+  googleClientSecret   String?
+  updatedAt            DateTime @updatedAt
+  updatedById          String?
 }

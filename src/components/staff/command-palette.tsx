@@ -126,7 +126,7 @@ export function CommandPalette({ role, open, onOpenChange }: { role: Role; open:
           <div className="flex items-center gap-4 border-t bg-muted/40 px-4 py-2.5 text-[11px] text-muted-foreground">
             <span><kbd className="font-sans font-semibold">↑ ↓</kbd> pilih</span>
             <span><kbd className="font-sans font-semibold">Enter</kbd> buka</span>
-            <span className="ml-auto">Santap POS</span>
+            <span className="ml-auto">Warm Hour · Santap POS</span>
           </div>
         </D.Content>
       </D.Portal>

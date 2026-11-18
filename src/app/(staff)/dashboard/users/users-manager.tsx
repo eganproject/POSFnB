@@ -1,11 +1,10 @@
 "use client";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import type { Role } from "@prisma/client";
 import { ChefHat, ConciergeBell, Pencil, Plus, Search, UserX, Users, Wallet, type LucideIcon } from "lucide-react";
 import { toast } from "sonner";
 import { cn, initials } from "@/lib/utils";
-import { ROLE_LABEL } from "@/lib/constants";
+import { ROLE_LABEL, STAFF_ROLES, type StaffRole } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Field, Input, NativeSelect } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -14,25 +13,25 @@ import { EmptyState, Switch } from "@/components/ui/misc";
 import { Table, TBody, TD, TH, THead, TR } from "@/components/ui/table";
 import { saveUser } from "@/server/actions/admin";
 
-type U = { id?: string; name: string; email: string; role: Role; outletId: string | null; outletName?: string | null; isActive: boolean };
+type U = { id?: string; name: string; email: string; role: StaffRole; outletId: string | null; outletName?: string | null; isActive: boolean };
 
-const ROLE_DESC: Record<Role, string> = {
+const ROLE_DESC: Record<StaffRole, string> = {
   OWNER: "Akses penuh semua outlet, menu, laporan",
   KASIR: "POS, pembayaran, shift, pesanan",
   DAPUR: "Layar dapur & stok menu",
   PELAYAN: "Konfirmasi & antar pesanan, input open bill",
 };
-const ROLE_ICON: Record<Role, LucideIcon> = { OWNER: Users, KASIR: Wallet, DAPUR: ChefHat, PELAYAN: ConciergeBell };
-const ROLE_VARIANT: Record<Role, "dark" | "default" | "info" | "success"> = { OWNER: "dark", KASIR: "default", DAPUR: "info", PELAYAN: "success" };
+const ROLE_ICON: Record<StaffRole, LucideIcon> = { OWNER: Users, KASIR: Wallet, DAPUR: ChefHat, PELAYAN: ConciergeBell };
+const ROLE_VARIANT: Record<StaffRole, "dark" | "default" | "info" | "success"> = { OWNER: "dark", KASIR: "default", DAPUR: "info", PELAYAN: "success" };
 
 export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { id: string; name: string }[]; meId: string }) {
   const router = useRouter();
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<U | null>(null);
-  const [role, setRole] = useState<Role>("KASIR");
+  const [role, setRole] = useState<StaffRole>("KASIR");
   const [active, setActive] = useState(true);
   const [pending, start] = useTransition();
-  const [roleFilter, setRoleFilter] = useState<"ALL" | Role>("ALL");
+  const [roleFilter, setRoleFilter] = useState<"ALL" | StaffRole>("ALL");
   const list = users.filter(
     (u) => (roleFilter === "ALL" || u.role === roleFilter) && `${u.name} ${u.email}`.toLowerCase().includes(q.toLowerCase())
   );
@@ -49,7 +48,7 @@ export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { 
       <div className="stagger grid grid-cols-2 gap-3 lg:grid-cols-4">
         {[
           { label: "Total akun", value: users.length, hint: `${activeCount} aktif`, icon: Users },
-          ...(["KASIR", "DAPUR", "PELAYAN"] as Role[]).map((r) => ({
+          ...(["KASIR", "DAPUR", "PELAYAN"] as StaffRole[]).map((r) => ({
             label: ROLE_LABEL[r],
             value: users.filter((u) => u.role === r).length,
             hint: ROLE_DESC[r],
@@ -77,7 +76,7 @@ export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { 
               <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari nama / email" className="h-9 pl-9" />
             </div>
             <div className="no-scrollbar flex max-w-full gap-1 overflow-x-auto rounded-xl bg-muted p-1">
-              {(["ALL", ...Object.keys(ROLE_LABEL)] as ("ALL" | Role)[]).map((r) => (
+              {(["ALL", ...STAFF_ROLES] as ("ALL" | StaffRole)[]).map((r) => (
                 <button
                   key={r}
                   type="button"
@@ -109,7 +108,7 @@ export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { 
             <THead className="bg-muted/40">
               <tr>
                 <TH>Nama</TH>
-                <TH>Role</TH>
+                <TH>StaffRole</TH>
                 <TH className="hidden md:table-cell">Outlet</TH>
                 <TH className="hidden sm:table-cell">Status</TH>
                 <TH className="w-14" />
@@ -120,7 +119,7 @@ export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { 
                 <TR key={u.id} className={cn("group", !u.isActive && "opacity-55")}>
                   <TD>
                     <div className="flex items-center gap-3">
-                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-gradient-to-br from-primary to-amber-500 text-xs font-bold text-white">{initials(u.name)}</span>
+                      <span className="grid size-9 shrink-0 place-items-center rounded-full bg-olive text-xs font-bold text-white">{initials(u.name)}</span>
                       <div className="min-w-0">
                         <p className="truncate font-medium">
                           {u.name} {u.id === meId && <span className="ml-1 rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">Anda</span>}
@@ -191,9 +190,9 @@ export function UsersManager({ users, outlets, meId }: { users: U[]; outlets: { 
                 <Field label="Email"><Input name="email" type="email" defaultValue={edit.email} required /></Field>
                 <Field label={edit.id ? "Password baru" : "Password"}><Input name="password" type="text" placeholder={edit.id ? "••••••" : "min. 6 karakter"} minLength={edit.id ? undefined : 6} required={!edit.id} /></Field>
               </div>
-              <Field label="Role">
+              <Field label="StaffRole">
                 <div className="grid grid-cols-2 gap-2">
-                  {(Object.keys(ROLE_LABEL) as Role[]).map((r) => (
+                  {STAFF_ROLES.map((r) => (
                     <button type="button" key={r} onClick={() => setRole(r)} className={cn("rounded-xl border p-3 text-left transition", role === r ? "border-primary bg-primary/6 ring-1 ring-primary" : "hover:bg-muted")}>
                       <p className="text-sm font-semibold">{ROLE_LABEL[r]}</p>
                       <p className="text-[11px] leading-snug text-muted-foreground">{ROLE_DESC[r]}</p>

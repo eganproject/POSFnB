@@ -2,13 +2,11 @@
 import { useState } from "react";
 import { cn } from "@/lib/utils";
 
+/** Latar ilustrasi saat produk belum punya foto: tetap di keluarga warna brand. */
 const GRADIENTS = [
-  "from-orange-200 via-amber-100 to-rose-100",
-  "from-amber-200 via-yellow-100 to-orange-100",
-  "from-rose-200 via-orange-100 to-amber-50",
-  "from-emerald-200 via-lime-100 to-amber-50",
-  "from-sky-200 via-cyan-100 to-emerald-50",
-  "from-fuchsia-200 via-pink-100 to-orange-50",
+  "from-cream to-[oklch(0.88_0.05_95)]",
+  "from-[oklch(0.9_0.035_113)] to-cream",
+  "from-[oklch(0.92_0.05_80)] to-[oklch(0.95_0.03_95)]",
 ];
 
 function hash(s: string) {
@@ -24,12 +22,14 @@ export function ProductImage({
   emoji,
   className,
   emojiClassName,
+  imgClassName,
 }: {
   src?: string | null;
   name: string;
   emoji?: string | null;
   className?: string;
   emojiClassName?: string;
+  imgClassName?: string;
 }) {
   const [failed, setFailed] = useState(false);
   const showImg = src && !failed;
@@ -48,11 +48,11 @@ export function ProductImage({
           alt={name}
           loading="lazy"
           onError={() => setFailed(true)}
-          className="absolute inset-0 size-full object-cover"
+          className={cn("absolute inset-0 size-full object-cover", imgClassName)}
         />
       ) : (
         <div className="absolute inset-0 grid place-items-center">
-          <span className={cn("text-4xl drop-shadow-sm", emojiClassName)} aria-hidden>
+          <span className={cn("text-3xl opacity-80 saturate-[0.7]", emojiClassName)} aria-hidden>
             {emoji || "🍽️"}
           </span>
         </div>

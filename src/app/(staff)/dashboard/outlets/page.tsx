@@ -13,7 +13,7 @@ export default async function OutletsPage() {
   });
   return (
     <div className="space-y-6">
-      <PageHeader title="Outlet" description="Cabang restoran, pajak, service charge, dan teks struk." />
+      <PageHeader title="Outlet" description="Cabang restoran, pajak, service charge, jam buka & takeaway, dan teks struk. Key Midtrans & login Google ada di Pengaturan." />
       <OutletsManager
         outlets={outlets.map((o) => ({
           id: o.id,
@@ -26,6 +26,10 @@ export default async function OutletsPage() {
           maxDiscountPercent: o.maxDiscountPercent,
           receiptFooter: o.receiptFooter,
           isActive: o.isActive,
+          takeawayEnabled: o.takeawayEnabled,
+          openTime: o.openTime,
+          closeTime: o.closeTime,
+          takeawayLeadMinutes: o.takeawayLeadMinutes,
           tables: o._count.tables,
           staff: o._count.users,
         }))}

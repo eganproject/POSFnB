@@ -1,7 +1,7 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
-import { Banknote, CreditCard, ShieldCheck, Trash2 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { Banknote, Clock, CreditCard, ShieldCheck, Trash2 } from "lucide-react";
 import { toast } from "sonner";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { Button } from "@/components/ui/button";
@@ -13,7 +13,10 @@ import { estimateTotals, modifierText } from "@/lib/cart";
 import type { useCart } from "@/hooks/use-cart";
 import { rememberOrder } from "@/hooks/use-cart";
 import { placeOrder } from "@/server/actions/customer";
-import type { MenuOutlet } from "./menu-app";
+import type { MenuCustomer, MenuOutlet, PickupConfig } from "./menu-app";
+import { canOrderAsap, formatClock, pickupSlots } from "@/lib/pickup";
+import { NativeSelect } from "@/components/ui/input";
+import { GoogleSignIn } from "./google-sign-in";
 
 export function CartSheet({
   open,
@@ -21,14 +24,43 @@ export function CartSheet({
   cart,
   outlet,
   table,
+  customer = null,
+  googleEnabled = false,
+  pickup = null,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
   cart: ReturnType<typeof useCart>;
   outlet: MenuOutlet;
   table: { token: string; name: string } | null;
+  customer?: MenuCustomer | null;
+  googleEnabled?: boolean;
+  pickup?: PickupConfig | null;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const [pickupMode, setPickupMode] = useState<"ASAP" | "LATER">("ASAP");
+  const [pickupSlot, setPickupSlot] = useState("");
+  // Hitung ulang slot jam ambil setiap keranjang dibuka
+  const schedule = useMemo(() => {
+    if (!pickup || !open) return null;
+    const now = new Date();
+    return {
+      asap: canOrderAsap(now, pickup, pickup.timeZone),
+      slots: pickupSlots(now, pickup, pickup.timeZone).map((d) => ({ value: d.toISOString(), label: formatClock(d, pickup.timeZone) })),
+    };
+  }, [pickup, open]);
+  useEffect(() => {
+    if (!schedule) return;
+    if (!schedule.asap) setPickupMode("LATER");
+    setPickupSlot((cur) => (schedule.slots.some((s) => s.value === cur) ? cur : schedule.slots[0]?.value ?? ""));
+  }, [schedule]);
+  const scheduled = Boolean(schedule && pickupMode === "LATER");
+  const takeawayOff = Boolean(pickup && !pickup.enabled);
+  const takeawayClosed = takeawayOff || Boolean(schedule && !schedule.asap && schedule.slots.length === 0);
+  useEffect(() => {
+    if (scheduled) setPay("ONLINE");
+  }, [scheduled]);
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
@@ -41,10 +73,12 @@ export function CartSheet({
       const saved = JSON.parse(localStorage.getItem("customer") || "{}");
       if (saved.name) setName(saved.name);
       if (saved.phone) setPhone(saved.phone);
+      if (!saved.name && customer?.name) setName(customer.name);
+      if (!saved.phone && customer?.phone) setPhone(customer.phone);
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [customer]);
 
   const totals = estimateTotals(cart.subtotal, outlet);
 
@@ -52,6 +86,14 @@ export function CartSheet({
     if (!name.trim()) {
       setNameError("Isi nama agar pesanan mudah dipanggil");
       document.getElementById("customer-name")?.focus();
+      return;
+    }
+    if (takeawayClosed) {
+      toast.error(takeawayOff ? "Takeaway sedang tidak tersedia." : "Takeaway hari ini sudah tutup.");
+      return;
+    }
+    if (scheduled && !pickupSlot) {
+      toast.error("Pilih jam ambil dulu.");
       return;
     }
     setSubmitting(true);
@@ -67,6 +109,7 @@ export function CartSheet({
       customerPhone: phone || null,
       note: note || null,
       payMethod: pay,
+      pickupAt: scheduled ? pickupSlot : null,
       lines: cart.lines.map((l) => ({
         productId: l.productId,
         quantity: l.quantity,
@@ -159,6 +202,73 @@ export function CartSheet({
                 </div>
               </section>
 
+              {schedule && (
+                <section className="space-y-3">
+                  <h3 className="font-semibold">Waktu ambil</h3>
+                  {takeawayOff ? (
+                    <p className="rounded-2xl bg-muted p-3.5 text-sm text-muted-foreground">
+                      Pesanan takeaway lewat aplikasi sedang tidak dibuka. Silakan pesan langsung di outlet atau scan QR di meja.
+                    </p>
+                  ) : takeawayClosed ? (
+                    <p className="rounded-2xl bg-muted p-3.5 text-sm text-muted-foreground">
+                      Takeaway hari ini sudah tutup (buka {pickup!.openTime}–{pickup!.closeTime}). Sampai jumpa besok!
+                    </p>
+                  ) : (
+                    <div className="grid grid-cols-2 gap-2.5">
+                      <button
+                        type="button"
+                        disabled={!schedule.asap}
+                        onClick={() => setPickupMode("ASAP")}
+                        className={cn(
+                          "rounded-2xl border p-3 text-left transition disabled:opacity-50",
+                          pickupMode === "ASAP" ? "border-primary bg-primary/6 ring-1 ring-primary" : "hover:bg-muted/50"
+                        )}
+                      >
+                        <span className="block text-sm font-semibold">Secepatnya</span>
+                        <span className="block text-xs text-muted-foreground">
+                          {schedule.asap ? `Siap ±${pickup!.leadMinutes} menit` : "Outlet belum buka"}
+                        </span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setPickupMode("LATER")}
+                        className={cn(
+                          "rounded-2xl border p-3 text-left transition",
+                          pickupMode === "LATER" ? "border-primary bg-primary/6 ring-1 ring-primary" : "hover:bg-muted/50"
+                        )}
+                      >
+                        <span className="flex items-center gap-1.5 text-sm font-semibold"><Clock className="size-3.5" /> Pilih jam</span>
+                        <span className="block text-xs text-muted-foreground">Ambil nanti, bayar online</span>
+                      </button>
+                      {pickupMode === "LATER" && (
+                        <NativeSelect
+                          aria-label="Jam ambil"
+                          value={pickupSlot}
+                          onChange={(e) => setPickupSlot(e.target.value)}
+                          className="col-span-2 h-11"
+                        >
+                          {schedule.slots.map((sl) => (
+                            <option key={sl.value} value={sl.value}>
+                              Ambil jam {sl.label}
+                            </option>
+                          ))}
+                        </NativeSelect>
+                      )}
+                    </div>
+                  )}
+                </section>
+              )}
+
+              {!customer && googleEnabled && (
+                <section className="space-y-2.5 rounded-2xl border border-dashed p-3.5">
+                  <p className="text-sm">
+                    <b>Simpan riwayat pesananmu.</b>{" "}
+                    <span className="text-muted-foreground">Masuk dengan Google agar bisa lihat riwayat & pesan lagi. Keranjangmu tidak hilang.</span>
+                  </p>
+                  <GoogleSignIn next={pathname} className="h-10" />
+                </section>
+              )}
+
               <section className="space-y-3">
                 <h3 className="font-semibold">Metode pembayaran</h3>
                 <div className="grid gap-2.5">
@@ -167,6 +277,7 @@ export function CartSheet({
                     { v: "CASHIER" as const, icon: Banknote, title: "Bayar di kasir", desc: "Pesanan dikonfirmasi staf, bayar tunai / EDC" },
                   ]
                     .filter((o) => o.v !== "ONLINE" || outlet.onlinePay)
+                    .filter((o) => !(scheduled && o.v === "CASHIER"))
                     .map((o) => (
                     <button
                       key={o.v}
@@ -187,6 +298,11 @@ export function CartSheet({
                       <span className={cn("size-5 rounded-full border-2", pay === o.v ? "border-[6px] border-primary" : "border-muted-foreground/30")} />
                     </button>
                   ))}
+                  {scheduled && !outlet.onlinePay && (
+                    <p className="rounded-2xl border border-dashed p-3.5 text-sm text-muted-foreground">
+                      Pesanan terjadwal harus dibayar online, dan pembayaran online belum aktif. Pilih ambil secepatnya untuk bayar di kasir.
+                    </p>
+                  )}
                 </div>
               </section>
 
@@ -209,7 +325,7 @@ export function CartSheet({
 
         {cart.lines.length > 0 && (
           <div className="border-t px-5 pb-safe pt-3">
-            <Button size="xl" className="w-full" loading={submitting} onClick={submit}>
+            <Button size="xl" className="w-full" loading={submitting} disabled={takeawayClosed} onClick={submit}>
               {pay === "ONLINE" ? "Pesan & bayar" : "Kirim pesanan"} · {formatRupiah(totals.total)}
             </Button>
           </div>
