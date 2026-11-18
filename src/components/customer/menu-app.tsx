@@ -1,16 +1,14 @@
 "use client";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { Bell, ChevronRight, Plus, Receipt, Search, ShoppingBag, Star, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
 import type { MenuCategory, MenuProduct } from "@/server/menu";
-import { cn, formatRupiah, initials } from "@/lib/utils";
+import { cn, formatRupiah } from "@/lib/utils";
 import { lineKey } from "@/lib/cart";
 import { recentOrders, useCart, type RememberedOrder } from "@/hooks/use-cart";
 import { usePathname, useRouter } from "next/navigation";
 import { ProductImage } from "@/components/shared/product-image";
 import { BrandMark } from "@/components/shared/brand-mark";
-import { BRAND } from "@/lib/brand";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/components/ui/drawer";
 import { ProductOptions } from "@/components/menu/product-options";
 import { Button } from "@/components/ui/button";
@@ -19,6 +17,7 @@ import { callStaff, getDeviceOrders } from "@/server/actions/customer";
 import { isActiveOrder, type OrderSummary } from "@/lib/order-summary";
 import { useRealtime } from "@/hooks/use-realtime";
 import { OrderSummaryCard } from "./order-summary-card";
+import { AccountSheet, CustomerAvatar, InfoSheet, clock, useOpenStatus } from "./menu-nav";
 
 export type MenuOutlet = {
   id: string;
@@ -28,6 +27,11 @@ export type MenuOutlet = {
   serviceRate: number;
   /** Pembayaran online (Midtrans / demo) tersedia */
   onlinePay: boolean;
+  slug: string;
+  openTime: string;
+  closeTime: string;
+  timeZone: string;
+  takeawayEnabled: boolean;
 };
 
 export type ReorderItem = {
@@ -109,6 +113,9 @@ export function MenuApp({
   const [cartOpen, setCartOpen] = useState(false);
   const [orders, setOrders] = useState<RememberedOrder[]>([]);
   const [ordersOpen, setOrdersOpen] = useState(false);
+  const [accountOpen, setAccountOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
+  const isOpen = useOpenStatus(outlet);
   const router = useRouter();
   const pathname = usePathname();
   const [bump, setBump] = useState(0);
@@ -226,6 +233,12 @@ export function MenuApp({
     setSelected({ product, emoji });
   };
 
+  /** Tutup lembar akun dulu, lalu buka lembar lain agar animasinya tidak bertumpuk */
+  const switchSheet = (open: () => void) => {
+    setAccountOpen(false);
+    setTimeout(open, 280);
+  };
+
   const handleCall = async (type: "CALL_WAITER" | "REQUEST_BILL") => {
     if (!table) return;
     const res = await callStaff(table.token, type);
@@ -237,47 +250,55 @@ export function MenuApp({
     <div className="mx-auto min-h-dvh max-w-xl bg-background pb-32">
       {/* Kepala halaman */}
       <header className="bg-olive px-5 pb-14 pt-5 text-cream">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex min-w-0 items-center gap-3">
+        <div className="flex items-center justify-between gap-2.5">
+          <button
+            type="button"
+            onClick={() => setInfoOpen(true)}
+            aria-label="Info kafe: jam buka, lokasi, Instagram"
+            className="flex min-w-0 items-center gap-3 rounded-2xl text-left outline-none focus-visible:ring-2 focus-visible:ring-cream/60"
+          >
             <BrandMark className="size-9 shrink-0" />
             <div className="min-w-0">
               <h1 className="truncate font-display text-[1.75rem] leading-none tracking-wide">{outlet.name}</h1>
-              <p className="mt-1 text-[11px] font-medium uppercase tracking-[0.2em] text-cream/65">{BRAND.tagline}</p>
+              <p className="mt-1.5 flex items-center gap-1.5 whitespace-nowrap text-[11px] font-semibold text-cream/75">
+                {isOpen !== null && <span className={cn("size-1.5 shrink-0 rounded-full", isOpen ? "bg-[oklch(0.82_0.13_150)]" : "bg-cream/50")} />}
+                <span className="truncate">
+                  {isOpen === false ? `Tutup · buka ${clock(outlet.openTime)}` : `Buka s.d. ${clock(outlet.closeTime)}`} ·{" "}
+                  <span className="border-b border-cream/45">Info kafe</span>
+                </span>
+              </p>
             </div>
-          </div>
+          </button>
           <div className="flex shrink-0 items-center gap-2">
             {orders.length > 0 && (
               <button
                 onClick={() => (orders.length === 1 ? router.push(`/order/${orders[0].id}`) : setOrdersOpen(true))}
-                className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-3.5 text-xs font-semibold transition hover:bg-cream/25"
+                className="relative flex h-10 shrink-0 items-center rounded-full bg-cream/15 px-3.5 text-xs font-semibold transition hover:bg-cream/25 active:bg-cream/25"
+                aria-label={`Pesanan saya${activeCount ? `, ${activeCount} sedang berjalan` : ""}`}
               >
-                <Receipt className="size-4" /> Pesanan{orders.length > 1 ? ` (${orders.length})` : ""}
-                {activeCount > 0 && (
+                Pesanan
+                {activeCount > 0 ? (
                   <span
-                    className={cn("absolute -right-0.5 -top-0.5 size-3 rounded-full ring-2 ring-olive", anyReady ? "animate-pulse bg-[oklch(0.75_0.15_150)]" : "bg-honey")}
-                    aria-label={anyReady ? "Ada pesanan siap" : "Ada pesanan berjalan"}
-                  />
+                    className={cn(
+                      "absolute -right-1 -top-1 grid h-[18px] min-w-[18px] place-items-center rounded-full px-1 text-[10.5px] font-bold ring-2 ring-olive",
+                      anyReady ? "animate-pulse bg-[oklch(0.8_0.14_150)] text-[oklch(0.3_0.07_150)]" : "bg-honey text-white"
+                    )}
+                  >
+                    {activeCount}
+                  </span>
+                ) : (
+                  orders.length > 1 && <span className="ml-1 text-cream/70">({orders.length})</span>
                 )}
               </button>
             )}
-            {(customer || googleEnabled) && (
-              <Link
-                href={`/akun?next=${encodeURIComponent(pathname)}`}
-                aria-label={customer ? "Akun saya" : "Masuk"}
-                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-1 text-xs font-semibold transition hover:bg-cream/25"
-              >
-                {customer ? (
-                  customer.image ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={customer.image} alt="" referrerPolicy="no-referrer" className="size-8 rounded-full object-cover" />
-                  ) : (
-                    <span className="grid size-8 place-items-center rounded-full bg-cream text-[11px] font-bold text-olive-deep">{initials(customer.name)}</span>
-                  )
-                ) : (
-                  <span className="flex items-center gap-1.5 px-2.5"><UserRound className="size-4" /> Masuk</span>
-                )}
-              </Link>
-            )}
+            <button
+              type="button"
+              onClick={() => setAccountOpen(true)}
+              aria-label={customer ? "Akun saya" : "Akun dan info"}
+              className="grid size-10 shrink-0 place-items-center rounded-full bg-cream/15 transition hover:bg-cream/25 active:bg-cream/25"
+            >
+              {customer ? <CustomerAvatar customer={customer} /> : <UserRound className="size-[18px]" />}
+            </button>
           </div>
         </div>
       </header>
@@ -545,6 +566,21 @@ export function MenuApp({
           </div>
         </DrawerContent>
       </Drawer>
+
+      <AccountSheet
+        open={accountOpen}
+        onOpenChange={setAccountOpen}
+        outlet={outlet}
+        customer={customer}
+        googleEnabled={googleEnabled}
+        isTable={!!table}
+        pathname={pathname}
+        ordersCount={orders.length}
+        activeCount={activeCount}
+        onOpenOrders={() => switchSheet(() => setOrdersOpen(true))}
+        onOpenInfo={() => switchSheet(() => setInfoOpen(true))}
+      />
+      <InfoSheet open={infoOpen} onOpenChange={setInfoOpen} outlet={outlet} />
 
       <CartSheet
         open={cartOpen}

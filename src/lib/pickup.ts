@@ -85,3 +85,8 @@ export function isValidPickup(pickupAt: Date, now: Date, hours: PickupHours, tim
 export function formatClock(d: Date, timeZone: string) {
   return new Intl.DateTimeFormat("en-GB", { timeZone, hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(d);
 }
+
+/** Apakah outlet sedang dalam jam buka (tanpa memperhitungkan waktu siap) */
+export function isOpenNow(now: Date, hours: Pick<PickupHours, "openTime" | "closeTime">, timeZone: string) {
+  return canOrderAsap(now, { ...hours, leadMinutes: 0 }, timeZone);
+}

@@ -48,7 +48,13 @@ export default async function TakeawayMenuPage({ params, searchParams }: Props) 
 
   return (
     <MenuApp
-      outlet={{ id: outlet.id, name: outlet.name, address: outlet.address, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate, onlinePay: await isOnlinePaymentAvailable() }}
+      outlet={{ id: outlet.id, name: outlet.name, address: outlet.address, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate, onlinePay: await isOnlinePaymentAvailable(),
+        slug: outlet.slug,
+        openTime: outlet.openTime,
+        closeTime: outlet.closeTime,
+        timeZone: process.env.APP_TIMEZONE || "Asia/Jakarta",
+        takeawayEnabled: outlet.takeawayEnabled,
+      }}
       table={null}
       categories={categories}
       customer={customer ? { name: customer.name, image: customer.image, phone: customer.phone } : null}
