@@ -1,0 +1,460 @@
+/*
+ * Animasi landing page (parallax, cangkir terisi, HP peraga alur pesan).
+ * Semua kelas berawalan `lp-` dan hanya berlaku di dalam `.lp`.
+ * Keadaan "tersembunyi sebelum muncul" hanya aktif setelah JavaScript jalan (`.lp-js`),
+ * jadi tanpa JavaScript semua konten tetap terlihat.
+ */
+.lp {
+  --lp-ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  --lp-header: 4rem;
+  overflow-x: clip;
+}
+
+/* ---------- Bilah kemajuan scroll ---------- */
+.lp-progress {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 50;
+  height: 3px;
+  background: var(--honey);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  pointer-events: none;
+}
+
+/* ---------- Header ---------- */
+.lp-header { transition: box-shadow 0.3s; }
+.lp-header.lp-scrolled { box-shadow: 0 10px 30px -18px rgb(0 0 0 / 0.55); }
+.lp-nav a { position: relative; padding-block: 0.375rem; }
+.lp-nav a::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 1px;
+  background: var(--cream);
+  transform: scaleX(0);
+  transform-origin: 0 50%;
+  transition: transform 0.35s var(--lp-ease);
+}
+.lp-nav a:hover::after,
+.lp-nav a.lp-on::after { transform: scaleX(1); }
+.lp-nav a.lp-on { color: var(--cream); }
+
+/* ---------- Muncul saat terlihat ---------- */
+.lp-js .lp-rv {
+  opacity: 0;
+  transform: translateY(34px);
+  transition: opacity 0.9s var(--lp-ease), transform 0.9s var(--lp-ease);
+  transition-delay: var(--d, 0s);
+}
+.lp-js .lp-rv.lp-in { opacity: 1; transform: none; }
+.lp-js .lp-fav.lp-rv { transform: translateY(46px) rotate(-2deg); }
+.lp-js .lp-fav.lp-rv:nth-child(even) { transform: translateY(46px) rotate(2deg); }
+.lp-js .lp-fav.lp-rv.lp-in { transform: none; }
+
+/* Garis yang "menggambar" dirinya */
+.lp-line { position: relative; }
+.lp-line::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: var(--lp-line-color, color-mix(in oklch, var(--olive) 45%, transparent));
+  transform-origin: 0 50%;
+  transition: transform 1.1s var(--lp-ease);
+  transition-delay: var(--d, 0s);
+}
+.lp-line.lp-line-b::before { inset: auto 0 0 0; }
+.lp-js .lp-line::before { transform: scaleX(0); }
+.lp-js .lp-line.lp-in::before { transform: scaleX(1); }
+
+/* ---------- Hero ---------- */
+.lp-hero { position: relative; overflow: hidden; }
+.lp-beans { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
+.lp-ln { display: block; overflow: hidden; padding-bottom: 0.06em; }
+.lp-ch {
+  display: inline-block;
+  transform: translateY(110%) rotate(8deg);
+  animation: lp-ch-up 1s var(--lp-ease) forwards;
+  animation-delay: calc(0.15s + var(--i) * 0.07s);
+}
+@keyframes lp-ch-up { to { transform: none; } }
+.lp-intro {
+  opacity: 0;
+  transform: translateY(22px);
+  animation: lp-intro-up 0.9s var(--lp-ease) forwards;
+  animation-delay: var(--d, 0.6s);
+}
+@keyframes lp-intro-up { to { opacity: 1; transform: none; } }
+
+.lp-collage { position: relative; width: 100%; max-width: 26rem; margin-inline: auto; }
+@media (min-width: 768px) { .lp-collage { max-width: none; } }
+.lp-plx { will-change: transform; }
+.lp-ph { overflow: hidden; background: color-mix(in oklch, var(--olive-deep) 30%, transparent); }
+.lp-ph img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lp-p1 { width: 78%; aspect-ratio: 4 / 5; border-radius: clamp(1.25rem, 4vw, 2rem); animation: lp-curtain 1.2s var(--lp-ease) 0.25s both; }
+.lp-p2,
+.lp-p3 { position: absolute; aspect-ratio: 1; box-shadow: 0 0 0 clamp(4px, 0.6vw, 6px) var(--olive); }
+.lp-p2 { right: 0; bottom: -1.5rem; width: 46%; border-radius: clamp(1rem, 3vw, 1.5rem); }
+.lp-p3 { right: 4%; top: 1.5rem; width: 32%; border-radius: clamp(0.85rem, 2.5vw, 1.25rem); }
+.lp-pop { animation: lp-pop 0.9s var(--lp-ease) both, lp-float 6s ease-in-out 1.6s infinite; }
+.lp-p2.lp-pop { animation-delay: 0.75s, 1.6s; }
+.lp-p3.lp-pop { animation-delay: 0.55s, 0.4s; animation-duration: 0.9s, 7.5s; }
+@keyframes lp-curtain { from { opacity: 0; clip-path: inset(100% 0 0 0); } to { opacity: 1; clip-path: inset(0 0 0 0); } }
+@keyframes lp-pop { from { opacity: 0; scale: 0.82; } to { opacity: 1; scale: 1; } }
+@keyframes lp-float { 50% { translate: 0 -10px; } }
+
+/* Stempel berputar dengan cangkir beruap */
+.lp-stamp {
+  position: absolute;
+  left: -0.25rem;
+  bottom: -2rem;
+  z-index: 3;
+  display: grid;
+  place-items: center;
+  width: clamp(5.75rem, 26%, 8rem);
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--cream);
+  color: var(--olive-deep);
+  box-shadow: 0 14px 30px -14px rgb(0 0 0 / 0.5);
+}
+.lp-stamp-ring { position: absolute; inset: 0; width: 100%; height: 100%; animation: lp-spin 18s linear infinite; }
+.lp-stamp-ring text { font-size: 10.5px; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; fill: currentColor; }
+.lp-stamp-cup { width: 42%; height: 42%; }
+@keyframes lp-spin { to { transform: rotate(360deg); } }
+.lp-steam path {
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-dasharray: 26;
+  animation: lp-steam 3.2s ease-in-out infinite;
+}
+.lp-steam path:nth-child(2) { animation-delay: 0.7s; }
+.lp-steam path:nth-child(3) { animation-delay: 1.4s; }
+@keyframes lp-steam {
+  0% { stroke-dashoffset: 26; opacity: 0; transform: translateY(5px); }
+  35% { opacity: 0.9; }
+  100% { stroke-dashoffset: -26; opacity: 0; transform: translateY(-8px); }
+}
+.lp-hint i {
+  display: block;
+  width: 1px;
+  height: 2rem;
+  background: linear-gradient(var(--cream), transparent);
+  transform-origin: 50% 0;
+  animation: lp-hint 1.8s ease-in-out infinite;
+}
+@keyframes lp-hint { 0% { transform: scaleY(0); } 60% { transform: scaleY(1); opacity: 1; } 100% { transform: scaleY(1); opacity: 0; } }
+
+/* ---------- Pita teks berjalan ---------- */
+.lp-ribbon { overflow: hidden; }
+.lp-ribbon-track { display: flex; width: max-content; white-space: nowrap; will-change: transform; }
+.lp-ribbon-track span { display: inline-flex; align-items: center; gap: clamp(1.25rem, 4vw, 2.5rem); padding-right: clamp(1.25rem, 4vw, 2.5rem); }
+.lp-ribbon-track span::after {
+  content: "";
+  flex: none;
+  width: 0.36em;
+  height: 0.52em;
+  border-radius: 50%;
+  background: var(--honey);
+  rotate: 28deg;
+}
+
+/* ---------- Cangkir terisi (layar menahan saat scroll) ---------- */
+.lp-brew { position: relative; height: 300vh; height: 300svh; }
+.lp-brew-pin { position: sticky; top: 0; height: 100vh; height: 100svh; overflow: hidden; display: flex; align-items: center; }
+.lp-caps { position: relative; min-height: 9.5rem; }
+.lp-cap { position: absolute; inset: 0 0 auto 0; opacity: 0; transform: translateY(16px); transition: opacity 0.5s, transform 0.5s var(--lp-ease); }
+.lp-cap.lp-on { opacity: 1; transform: none; }
+.lp-dots i { display: block; height: 3px; width: 2.1rem; border-radius: 3px; background: color-mix(in oklch, var(--cream) 22%, transparent); overflow: hidden; }
+.lp-dots i::after { content: ""; display: block; height: 100%; background: var(--honey); transform: scaleX(var(--f, 0)); transform-origin: 0 50%; }
+.lp-cup { width: min(100%, 26rem, 52svh); margin-inline: auto; }
+.lp-cup svg { display: block; width: 100%; height: auto; overflow: visible; }
+.lp-wave { animation: lp-wave 2.4s linear infinite; }
+@keyframes lp-wave { to { transform: translateX(-80px); } }
+.lp-bsteam path { fill: none; stroke: var(--cream); stroke-width: 5; stroke-linecap: round; stroke-dasharray: 70; animation: lp-steam-b 3.6s ease-in-out infinite; }
+.lp-bsteam path:nth-child(2) { animation-delay: 0.8s; }
+.lp-bsteam path:nth-child(3) { animation-delay: 1.6s; }
+@keyframes lp-steam-b {
+  0% { stroke-dashoffset: 70; opacity: 0; transform: translateY(10px); }
+  35% { opacity: 0.75; }
+  100% { stroke-dashoffset: -70; opacity: 0; transform: translateY(-22px); }
+}
+@media (max-width: 767px) {
+  .lp-cup { width: min(64vw, 34svh); }
+  .lp-caps { min-height: 8.5rem; }
+}
+
+/* ---------- Favorit ---------- */
+.lp-favs { perspective: 1100px; }
+.lp-tilt { transition: transform 0.5s var(--lp-ease), box-shadow 0.5s; }
+.lp-fav:hover .lp-tilt { box-shadow: 0 26px 40px -26px color-mix(in oklch, var(--foreground) 60%, transparent); }
+
+/* ---------- Jendela parallax ---------- */
+.lp-band { position: relative; overflow: hidden; display: grid; place-items: center; text-align: center; height: 78vh; height: 78svh; min-height: 22rem; max-height: 46rem; }
+.lp-band-sm { height: 62vh; height: 62svh; min-height: 18rem; max-height: 38rem; }
+.lp-band-bg { position: absolute; inset: -22% 0 auto 0; height: 144%; will-change: transform; }
+.lp-band-bg img { display: block; width: 100%; height: 100%; object-fit: cover; }
+.lp-band::after { content: ""; position: absolute; inset: 0; background: linear-gradient(rgb(47 49 38 / 0.35), rgb(47 49 38 / 0.62)); }
+.lp-band-in { position: relative; z-index: 2; will-change: transform; }
+.lp-ghost {
+  position: absolute;
+  z-index: 1;
+  left: 0;
+  bottom: -0.18em;
+  white-space: nowrap;
+  line-height: 1;
+  font-size: clamp(5rem, 24vw, 19rem);
+  color: transparent;
+  -webkit-text-stroke: 1px color-mix(in oklch, var(--cream) 35%, transparent);
+  will-change: transform;
+}
+
+/* ---------- Galeri ruang ---------- */
+.lp-gal .lp-ph { aspect-ratio: 3 / 4; border-radius: 1rem; transition: clip-path 1.2s var(--lp-ease); transition-delay: var(--d, 0s); }
+.lp-gal .lp-ph img { height: 126%; margin-top: -13%; will-change: transform; }
+.lp-js .lp-gal .lp-ph { clip-path: inset(100% 0 0 0 round 1rem); }
+.lp-js .lp-gal.lp-in .lp-ph { clip-path: inset(0 0 0 0 round 1rem); }
+.lp-w { display: inline-block; transition: opacity 0.5s, transform 0.5s var(--lp-ease); transition-delay: calc(var(--d, 0s) + var(--i) * 45ms); }
+.lp-js .lp-w { opacity: 0; transform: translateY(10px); }
+.lp-js .lp-in .lp-w { opacity: 1; transform: none; }
+
+/* ---------- Cara pesan: HP memperagakan alur ---------- */
+.lp-flow { position: relative; height: 400vh; height: 400svh; }
+.lp-flow-pin {
+  position: sticky;
+  top: var(--lp-header);
+  height: calc(100vh - var(--lp-header));
+  height: calc(100svh - var(--lp-header));
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
+.lp-steps { position: relative; display: grid; gap: 0.375rem; }
+.lp-steps li:not(.lp-rail) {position: relative; padding: 0.75rem 0 0.75rem 3.6rem; opacity: 0.38; transition: opacity 0.4s; }
+.lp-steps li.lp-on { opacity: 1; }
+.lp-step-n {
+  position: absolute;
+  left: 0;
+  top: 0.5rem;
+  display: grid;
+  place-items: center;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  border: 1.5px solid var(--olive);
+  background: var(--background);
+  color: var(--olive-deep);
+  transition: background 0.4s, color 0.4s, transform 0.4s var(--lp-ease);
+}
+.lp-steps li.lp-on .lp-step-n { background: var(--olive); color: var(--cream); transform: scale(1.1); }
+.lp-steps li p { max-height: 0; overflow: hidden; transition: max-height 0.5s var(--lp-ease), margin 0.5s; }
+.lp-steps li.lp-on p { max-height: 6rem; margin-top: 0.25rem; }
+.lp-rail { list-style: none; position: absolute; left: 1.22rem; top: 1.75rem; bottom: 1.75rem; width: 1.5px; background: var(--border); }
+.lp-rail i { display: block; width: 100%; height: 100%; background: var(--olive); transform: scaleY(var(--f, 0)); transform-origin: 50% 0; }
+
+.lp-phone {
+  position: relative;
+  width: min(18.75rem, 40svh, 78vw);
+  aspect-ratio: 9 / 18.6;
+  margin-inline: auto;
+  border-radius: 13.5% / 6.5%;
+  background: #1f2019;
+  padding: 3%;
+  box-shadow: 0 40px 60px -34px rgb(47 49 38 / 0.7), inset 0 0 0 1.5px #3a3c30;
+  transition: transform 0.8s var(--lp-ease);
+}
+.lp-phone::before { content: ""; position: absolute; left: 50%; top: 2.6%; translate: -50% 0; width: 23%; height: 2.9%; border-radius: 99px; background: #1f2019; z-index: 5; }
+.lp-screen { position: relative; width: 100%; height: 100%; border-radius: 11.5% / 5.6%; overflow: hidden; background: var(--background); container-type: inline-size; }
+/* Isi layar memakai satuan em, dan 1em mengikuti lebar HP, jadi semuanya ikut mengecil/membesar */
+.lp-scr {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  font-size: 11px;
+  font-size: 4.6cqw;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translateX(26%) scale(0.96);
+  transition: opacity 0.5s, transform 0.6s var(--lp-ease);
+  pointer-events: none;
+}
+.lp-scr.lp-on { opacity: 1; transform: none; }
+.lp-scr.lp-past { transform: translateX(-26%) scale(0.96); }
+.lp-sbar { flex: none; height: 3.4em; }
+.lp-shead { flex: none; display: flex; align-items: center; justify-content: space-between; gap: 0.6em; padding: 0.2em 1.25em 0.9em; }
+.lp-shead b { font-family: var(--font-display); font-weight: 400; font-size: 1.55em; color: var(--olive-deep); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lp-pill { flex: none; border-radius: 99px; background: var(--olive); color: var(--cream); padding: 0.25em 0.8em; font-size: 0.86em; font-weight: 600; }
+/* layar 1: kamera scan */
+.lp-s-scan { background: #23241d; color: var(--cream); }
+.lp-s-table { flex: 1; display: grid; place-items: center; background: radial-gradient(120% 80% at 50% 60%, #8a6a44 0, #4d3a26 60%, #23241d 100%); }
+.lp-qcard { position: relative; width: 62%; border-radius: 0.9em; background: var(--cream); color: var(--olive-deep); padding: 0.9em 0.9em 0.7em; text-align: center; rotate: -4deg; box-shadow: 0 1.2em 2em -0.9em rgb(0 0 0 / 0.6); }
+.lp-qcard small { display: block; font-size: 0.72em; font-weight: 700; letter-spacing: 0.2em; }
+.lp-qcard strong { display: block; font-family: var(--font-display); font-weight: 400; font-size: 2em; line-height: 1; }
+.lp-qr { display: grid; grid-template-columns: repeat(13, 1fr); gap: 1px; aspect-ratio: 1; width: 86%; margin: 0.55em auto 0; }
+.lp-qr i { background: var(--olive-deep); border-radius: 1px; }
+.lp-qr i.o { background: transparent; }
+.lp-finder { position: absolute; inset: 16% 12% 30%; }
+.lp-finder::before,
+.lp-finder::after,
+.lp-finder b::before,
+.lp-finder b::after { content: ""; position: absolute; width: 2em; height: 2em; border: 0.22em solid #fff; }
+.lp-finder::before { left: 0; top: 0; border-right: 0; border-bottom: 0; border-radius: 0.7em 0 0 0; }
+.lp-finder::after { right: 0; top: 0; border-left: 0; border-bottom: 0; border-radius: 0 0.7em 0 0; }
+.lp-finder b::before { left: 0; bottom: 0; border-right: 0; border-top: 0; border-radius: 0 0 0 0.7em; }
+.lp-finder b::after { right: 0; bottom: 0; border-left: 0; border-top: 0; border-radius: 0 0 0.7em 0; }
+.lp-finder s { position: absolute; left: 4%; right: 4%; top: 4%; height: 2px; background: #f6d79b; box-shadow: 0 0 14px 3px rgb(246 215 155 / 0.7); }
+.lp-scr.lp-on .lp-finder s { animation: lp-scan 1.9s ease-in-out infinite; }
+@keyframes lp-scan { 0%, 100% { top: 4%; } 50% { top: 94%; } }
+.lp-toast { position: absolute; left: 0.9em; right: 0.9em; bottom: 1.25em; display: flex; align-items: center; gap: 0.7em; border-radius: 1.1em; background: var(--cream); color: var(--olive-deep); padding: 0.8em 1em; font-weight: 600; opacity: 0; transform: translateY(1.2em); }
+.lp-scr.lp-on .lp-toast { animation: lp-toast 3.8s var(--lp-ease) infinite; }
+@keyframes lp-toast { 0%, 38% { opacity: 0; transform: translateY(1.2em); } 48%, 92% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+.lp-ok { flex: none; display: grid; place-items: center; width: 1.6em; height: 1.6em; border-radius: 50%; background: #4f8a5b; color: #fff; }
+/* layar 2: menu */
+.lp-mlist { flex: 1; min-height: 0; overflow: hidden; display: grid; gap: 0.7em; align-content: start; padding: 0 1.1em; }
+.lp-mitem { display: flex; align-items: center; gap: 0.8em; border-radius: 1.1em; background: var(--card); border: 1px solid var(--border); padding: 0.6em; }
+.lp-mthumb { flex: none; width: 3.8em; height: 3.8em; border-radius: 0.8em; }
+.lp-mname { font-weight: 700; font-size: 1.05em; line-height: 1.2; }
+.lp-mprice { color: var(--muted-foreground); font-size: 0.9em; }
+.lp-madd { flex: none; margin-left: auto; display: grid; place-items: center; width: 2.2em; height: 2.2em; border-radius: 50%; background: var(--olive); color: var(--cream); font-size: 1em; line-height: 1; }
+.lp-scr.lp-on .lp-hit .lp-madd { animation: lp-tap 3.4s var(--lp-ease) infinite; }
+.lp-scr.lp-on .lp-hit { animation: lp-hit 3.4s ease infinite; }
+@keyframes lp-tap { 0%, 22%, 48%, 100% { transform: scale(1); background: var(--olive); } 30% { transform: scale(0.78); } 38% { transform: scale(1.25); background: var(--honey); } }
+@keyframes lp-hit { 0%, 22%, 60%, 100% { border-color: var(--border); } 34% { border-color: var(--honey); } }
+.lp-cart { flex: none; display: flex; justify-content: space-between; gap: 0.6em; white-space: nowrap; margin: 0.7em 1.1em 1.25em; border-radius: 99px; background: var(--olive); color: var(--cream); padding: 0.9em 1.25em; font-weight: 600; }
+.lp-cart em { font-style: normal; display: inline-grid; place-items: center; min-width: 1.7em; height: 1.7em; border-radius: 99px; background: var(--cream); color: var(--olive-deep); font-size: 0.9em; margin-right: 0.55em; }
+.lp-scr.lp-on .lp-cart { animation: lp-bump 3.4s var(--lp-ease) infinite; }
+@keyframes lp-bump { 0%, 40%, 60%, 100% { transform: none; } 48% { transform: scale(1.05); } }
+/* layar 3: bayar */
+.lp-pay { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.7em; padding: 0 1.4em 2em; text-align: center; color: var(--muted-foreground); }
+.lp-amt { font-family: var(--font-display); font-size: 2.4em; line-height: 1.1; color: var(--olive-deep); }
+.lp-qris { position: relative; width: 58%; padding: 0.7em; border-radius: 1.1em; background: #fff; border: 1px solid var(--border); }
+.lp-qris .lp-qr { width: 100%; margin: 0; }
+.lp-paid { position: absolute; inset: 0; display: grid; place-items: center; border-radius: inherit; background: rgb(79 138 91 / 0.96); color: #fff; font-weight: 700; opacity: 0; }
+.lp-paid svg { display: block; width: 3.6em; height: 3.6em; margin-inline: auto; stroke: #fff; stroke-width: 3.5; fill: none; stroke-linecap: round; stroke-linejoin: round; stroke-dasharray: 40; stroke-dashoffset: 40; }
+.lp-scr.lp-on .lp-paid { animation: lp-paid 4.2s ease infinite; }
+.lp-scr.lp-on .lp-paid svg { animation: lp-tick 4.2s ease infinite; }
+@keyframes lp-paid { 0%, 45% { opacity: 0; transform: scale(0.9); } 55%, 94% { opacity: 1; transform: none; } 100% { opacity: 0; } }
+@keyframes lp-tick { 0%, 52% { stroke-dashoffset: 40; } 68%, 100% { stroke-dashoffset: 0; } }
+/* layar 4: pantau */
+.lp-track { flex: 1; display: flex; flex-direction: column; gap: 0.9em; padding: 0 1.25em; }
+.lp-tcard { border-radius: 1.25em; background: var(--card); border: 1px solid var(--border); padding: 1em; }
+.lp-tbig { font-family: var(--font-serif); font-style: italic; font-weight: 600; font-size: 1.55em; line-height: 1.2; color: var(--olive-deep); }
+.lp-bars,
+.lp-lbls { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.45em; }
+.lp-bars { margin-top: 0.8em; }
+.lp-bars i { display: block; height: 0.45em; border-radius: 99px; background: var(--border); overflow: hidden; }
+.lp-bars i::after { content: ""; display: block; height: 100%; background: var(--olive); transform: scaleX(0); transform-origin: 0 50%; }
+.lp-scr.lp-on .lp-bars i::after { animation: lp-bar1 6s linear infinite; }
+.lp-scr.lp-on .lp-bars i:nth-child(2)::after { animation-name: lp-bar2; }
+.lp-scr.lp-on .lp-bars i:nth-child(3)::after { animation-name: lp-bar3; }
+@keyframes lp-bar1 { 0% { transform: scaleX(0); } 20%, 100% { transform: scaleX(1); } }
+@keyframes lp-bar2 { 0%, 25% { transform: scaleX(0); } 55%, 100% { transform: scaleX(1); } }
+@keyframes lp-bar3 { 0%, 60% { transform: scaleX(0); } 80%, 100% { transform: scaleX(1); } }
+.lp-lbls { margin-top: 0.45em; font-size: 0.82em; color: var(--muted-foreground); }
+.lp-titem { display: flex; align-items: center; gap: 0.7em; padding: 0.55em 0; border-top: 1px solid var(--border); font-weight: 600; }
+.lp-titem:first-child { border-top: 0; }
+.lp-titem span:first-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lp-st { flex: none; margin-left: auto; border-radius: 99px; padding: 0.2em 0.9em; font-size: 0.82em; font-weight: 700; background: #f1e3bd; color: #7a5a17; }
+.lp-scr.lp-on .lp-st { animation: lp-st 6s steps(1) infinite; }
+.lp-scr.lp-on .lp-titem:nth-child(2) .lp-st { animation-delay: 0.8s; }
+@keyframes lp-st { 0% { background: #f1e3bd; color: #7a5a17; } 60%, 100% { background: #d6e8d6; color: #2f6a3c; } }
+.lp-bell { position: absolute; right: 1.1em; top: 3.8em; display: grid; place-items: center; width: 2.7em; height: 2.7em; border-radius: 50%; background: var(--honey); opacity: 0; }
+.lp-scr.lp-on .lp-bell { animation: lp-bell 6s ease infinite; }
+@keyframes lp-bell {
+  0%, 78% { opacity: 0; transform: scale(0.4); }
+  82% { opacity: 1; transform: scale(1.15) rotate(-14deg); }
+  86% { transform: rotate(14deg); }
+  90% { transform: rotate(-8deg); }
+  94%, 98% { opacity: 1; transform: none; }
+  100% { opacity: 0; }
+}
+/* gelembung di sekitar HP */
+.lp-bub {
+  position: absolute;
+  z-index: 6;
+  border-radius: 0.9rem;
+  background: var(--card);
+  border: 1px solid var(--border);
+  box-shadow: 0 18px 30px -20px rgb(47 49 38 / 0.6);
+  padding: 0.5rem 0.75rem;
+  font-size: 0.75rem;
+  font-weight: 600;
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateY(12px) scale(0.94);
+  transition: opacity 0.5s, transform 0.6s var(--lp-ease);
+}
+.lp-bub.lp-on { opacity: 1; transform: none; }
+.lp-bub small { display: block; font-weight: 500; color: var(--muted-foreground); }
+.lp-bub-a { left: 0; top: 16%; }
+.lp-bub-b { right: 0; top: 46%; }
+.lp-bub-c { left: 0; bottom: 14%; }
+
+/* HP & tablet tegak: satu kolom, langkah tampil satu per satu di atas HP */
+@media (max-width: 859px) {
+  .lp-flow-pin { align-items: flex-start; padding-top: clamp(0.75rem, 3svh, 2rem); }
+  .lp-steps { min-height: 6.75rem; }
+  .lp-rail { display: none; }
+  .lp-steps li:not(.lp-rail) {position: absolute; inset: 0 0 auto 0; padding: 0 0 0 3.4rem; opacity: 0; transform: translateY(12px); transition: opacity 0.4s, transform 0.4s var(--lp-ease); }
+  .lp-steps li.lp-on { opacity: 1; transform: none; }
+  .lp-steps li p { max-height: none; margin-top: 0.15rem; }
+  .lp-step-n { top: 0; }
+  .lp-phone { width: min(17rem, 23svh + 2.5rem, 70vw); }
+  .lp-bub { display: none; }
+}
+@media (min-width: 560px) and (max-width: 859px) {
+  .lp-steps { min-height: 5.25rem; }
+  .lp-phone { width: min(19rem, 27svh + 2.5rem); }
+}
+
+/* Layar pendek (HP mendatar): tidak ada layar yang menahan, semuanya mengalir biasa */
+@media (max-height: 520px) {
+  .lp-brew,
+  .lp-flow { height: auto; }
+  .lp-brew-pin,
+  .lp-flow-pin { position: static; height: auto; overflow: visible; padding-block: 3.5rem; }
+  .lp-caps { min-height: 0; display: grid; gap: 1rem; }
+  .lp-cap { position: static; opacity: 1; transform: none; }
+  .lp-dots { display: none; }
+  .lp-cup { width: min(15rem, 44vw); }
+  .lp-steps { min-height: 0; }
+  .lp-steps li:not(.lp-rail) {position: relative; inset: auto; padding: 0.5rem 0 0.5rem 3.4rem; opacity: 0.45; transform: none; }
+  .lp-steps li.lp-on { opacity: 1; }
+  .lp-phone { width: min(13rem, 40vw); }
+}
+@media (max-height: 520px) and (min-width: 600px) {
+  .lp-flow-grid { grid-template-columns: 1fr auto; align-items: center; column-gap: 2.5rem; }
+}
+
+/* ---------- Kunjungi ---------- */
+.lp-pin { position: relative; display: inline-block; width: 2.75rem; height: 3.5rem; }
+.lp-pin svg { position: relative; display: block; width: 100%; height: 100%; fill: var(--cream); }
+.lp-js .lp-pin svg { opacity: 0; }
+.lp-js .lp-pin.lp-in svg { animation: lp-drop 0.9s cubic-bezier(0.3, 1.6, 0.5, 1) forwards; }
+@keyframes lp-drop { 0% { opacity: 0; transform: translateY(-70px); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+.lp-pin::after { content: ""; position: absolute; left: 50%; bottom: -6px; width: 2.5rem; height: 0.75rem; translate: -50% 0; border-radius: 50%; border: 1.5px solid var(--cream); opacity: 0; }
+.lp-pin.lp-in::after { animation: lp-ripple 2.4s ease-out 0.8s infinite; }
+@keyframes lp-ripple { 0% { opacity: 0.8; transform: scale(0.3); } 100% { opacity: 0; transform: scale(2.4); } }
+.lp-open i { display: block; width: 0.5rem; height: 0.5rem; border-radius: 50%; background: #9be29f; animation: lp-pulse 1.8s infinite; }
+.lp-open.lp-closed i { background: #e7a08f; animation: none; }
+@keyframes lp-pulse { from { box-shadow: 0 0 0 0 rgb(155 226 159 / 0.7); } to { box-shadow: 0 0 0 10px rgb(155 226 159 / 0); } }
+
+/* ---------- Kurangi animasi ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .lp-beans { display: none; }
+  .lp-js .lp-rv,
+  .lp-js .lp-w,
+  .lp-js .lp-pin svg { opacity: 1; transform: none; }
+  .lp-js .lp-gal .lp-ph { clip-path: none; }
+  .lp-js .lp-line::before { transform: none; }
+  .lp-ch,
+  .lp-intro { opacity: 1; transform: none; animation: none; }
+  .lp-p1,
+  .lp-pop,
+  .lp-stamp-ring,
+  .lp-hint i,
+  .lp-wave { animation: none; }
+}
