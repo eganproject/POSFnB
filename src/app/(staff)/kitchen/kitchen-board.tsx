@@ -2,14 +2,15 @@
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { OrderSource, OrderType, Role } from "@prisma/client";
-import { ArrowLeft, Check, ChefHat, Flame, HandPlatter, Maximize, PackageX, Undo2, Volume2, VolumeX } from "lucide-react";
+import type { OrderItemStatus, OrderSource, OrderType, Role } from "@prisma/client";
+import { ArrowLeft, Check, CheckCheck, ChefHat, Flame, HandPlatter, Maximize, PackageX, Play, Undo2, Volume2, VolumeX } from "lucide-react";
 import { toast } from "sonner";
 import { cn, pad } from "@/lib/utils";
 import { useRealtime } from "@/hooks/use-realtime";
 import { chime } from "@/components/staff/live-alerts";
 import { Button } from "@/components/ui/button";
-import { toggleItemDone, updateOrderStatus } from "@/server/actions/staff";
+import { updateItemStatus, updateOrderStatus } from "@/server/actions/staff";
+import { itemProgress, itemStatusLabel } from "@/lib/order-flow";
 
 type KOrder = {
   id: string;
@@ -24,12 +25,12 @@ type KOrder = {
   note: string | null;
   since: string;
   readyAt: string | null;
-  items: { id: string; name: string; quantity: number; note: string | null; isDone: boolean; modifiers: string[] }[];
+  items: { id: string; name: string; quantity: number; note: string | null; status: OrderItemStatus; modifiers: string[] }[];
 };
 
 const COLUMNS = [
   { key: "CONFIRMED", title: "Antrean baru", icon: Flame, accent: "bg-sky-500" },
-  { key: "PREPARING", title: "Sedang dimasak", icon: ChefHat, accent: "bg-primary" },
+  { key: "PREPARING", title: "Sedang dibuat", icon: ChefHat, accent: "bg-primary" },
   { key: "READY", title: "Siap diantar", icon: HandPlatter, accent: "bg-emerald-500" },
 ] as const;
 
@@ -53,7 +54,7 @@ export function KitchenBoard({ outletName, orders, role }: { outletName: string;
     const map = new Map<string, number>();
     for (const o of orders) {
       if (o.status === "READY") continue;
-      for (const i of o.items) if (!i.isDone) map.set(i.name, (map.get(i.name) ?? 0) + i.quantity);
+      for (const i of o.items) if (i.status === "QUEUED" || i.status === "PREPARING") map.set(i.name, (map.get(i.name) ?? 0) + i.quantity);
     }
     return [...map.entries()].map(([name, qty]) => ({ name, qty })).sort((a, b) => b.qty - a.qty);
   }, [orders]);
@@ -144,12 +145,22 @@ export function KitchenBoard({ outletName, orders, role }: { outletName: string;
   );
 }
 
+/** Mundur satu langkah (koreksi salah tekan) */
+const BACK: Partial<Record<OrderItemStatus, OrderItemStatus>> = { PREPARING: "QUEUED", READY: "PREPARING", SERVED: "READY" };
+
+const ITEM_TONE: Record<OrderItemStatus, string> = {
+  QUEUED: "bg-sky-500/15 text-sky-300",
+  PREPARING: "bg-primary/20 text-primary",
+  READY: "bg-emerald-500/20 text-emerald-300",
+  SERVED: "bg-muted text-muted-foreground",
+};
+
 function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const minutes = Math.max(0, Math.floor((now - new Date(o.since).getTime()) / 60000));
   const urgency = o.status === "READY" ? "ok" : minutes >= 20 ? "late" : minutes >= 10 ? "warn" : "ok";
-  const allDone = o.items.every((i) => i.isDone);
+  const p = itemProgress(o.items);
 
   const move = (to: "PREPARING" | "READY" | "COMPLETED" | "CONFIRMED") =>
     start(async () => {
@@ -158,9 +169,9 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
       router.refresh();
     });
 
-  const toggle = (id: string, done: boolean) =>
+  const setItem = (id: string, expected: OrderItemStatus, to: OrderItemStatus) =>
     start(async () => {
-      const r = await toggleItemDone(id, done);
+      const r = await updateItemStatus({ orderId: o.id, itemIds: [id], expected, to });
       if (!r.ok) toast.error(r.error);
       router.refresh();
     });
@@ -170,7 +181,7 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
       className={cn(
         "overflow-hidden rounded-2xl border-2 bg-card shadow-lg transition animate-fade-up",
         urgency === "late" ? "border-destructive" : urgency === "warn" ? "border-warning" : "border-transparent",
-        pending && "opacity-60"
+        pending && "pointer-events-none opacity-60"
       )}
     >
       <div className={cn("flex items-center justify-between px-4 py-3", urgency === "late" ? "bg-destructive/20" : urgency === "warn" ? "bg-warning/15" : "bg-muted/60")}>
@@ -183,43 +194,91 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
           <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{o.type === "TAKEAWAY" ? "Bungkus" : "Makan di tempat"}</p>
         </div>
       </div>
+      {p.total > 1 && o.status !== "CONFIRMED" && (
+        <div className="flex items-center gap-2 px-4 pt-2.5 text-xs font-semibold">
+          <span className="flex h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+            <span className="bg-muted-foreground/50" style={{ width: `${(p.served / p.total) * 100}%` }} />
+            <span className="bg-emerald-500" style={{ width: `${(p.toServe / p.total) * 100}%` }} />
+            <span className="bg-primary/70" style={{ width: `${(p.preparing / p.total) * 100}%` }} />
+          </span>
+          <span className="tabular text-muted-foreground">
+            {p.done}/{p.total} siap{p.toServe > 0 && o.status !== "READY" ? ` · ${p.toServe} perlu diantar` : ""}
+          </span>
+        </div>
+      )}
       <ul className="divide-y divide-border/60">
-        {o.items.map((i) => (
-          <li key={i.id}>
-            <button
-              disabled={o.status === "READY"}
-              onClick={() => toggle(i.id, !i.isDone)}
-              className={cn("flex w-full gap-3 px-4 py-2.5 text-left transition hover:bg-muted/40", i.isDone && "opacity-40")}
-            >
-              <span className={cn("mt-0.5 grid size-6 shrink-0 place-items-center rounded-md border-2", i.isDone ? "border-success bg-success text-white" : "border-muted-foreground/40")}>
-                {i.isDone && <Check className="size-3.5" strokeWidth={3} />}
-              </span>
-              <div className="flex-1">
-                <p className={cn("font-semibold", i.isDone && "line-through")}>
+        {o.items.map((i) => {
+          const back = BACK[i.status];
+          return (
+            <li key={i.id} className={cn("flex items-start gap-3 px-4 py-2.5", i.status === "SERVED" && "opacity-45")}>
+              <div className="min-w-0 flex-1">
+                <p className={cn("font-semibold", i.status === "SERVED" && "line-through")}>
                   <span className="mr-1.5 text-primary">{i.quantity}×</span>
                   {i.name}
                 </p>
                 {i.modifiers.length > 0 && <p className="text-sm text-muted-foreground">{i.modifiers.join(" · ")}</p>}
                 {i.note && <p className="mt-0.5 rounded-md bg-warning/20 px-2 py-0.5 text-sm font-medium text-warning">⚠ {i.note}</p>}
+                <span className={cn("mt-1 inline-block rounded-full px-2 py-0.5 text-[11px] font-semibold", ITEM_TONE[i.status])}>
+                  {itemStatusLabel(i.status, o.type)}
+                </span>
               </div>
-            </button>
-          </li>
-        ))}
+              <div className="flex shrink-0 items-center gap-1.5">
+                {back && (
+                  <button
+                    onClick={() => setItem(i.id, i.status, back)}
+                    aria-label={`Kembalikan ${i.name} ke ${itemStatusLabel(back, o.type)}`}
+                    title={`Kembalikan ke ${itemStatusLabel(back, o.type)}`}
+                    className="grid size-9 place-items-center rounded-lg text-muted-foreground hover:bg-muted"
+                  >
+                    <Undo2 className="size-4" />
+                  </button>
+                )}
+                {i.status === "QUEUED" && (
+                  <>
+                    <button
+                      onClick={() => setItem(i.id, "QUEUED", "READY")}
+                      aria-label={`${i.name} langsung siap`}
+                      title="Langsung siap"
+                      className="grid size-9 place-items-center rounded-lg bg-muted text-emerald-400 hover:bg-muted/70"
+                    >
+                      <Check className="size-4" />
+                    </button>
+                    <Button size="sm" className="h-9" onClick={() => setItem(i.id, "QUEUED", "PREPARING")}>
+                      <Play /> Mulai
+                    </Button>
+                  </>
+                )}
+                {i.status === "PREPARING" && (
+                  <Button size="sm" variant="success" className="h-9" onClick={() => setItem(i.id, "PREPARING", "READY")}>
+                    <HandPlatter /> Siap
+                  </Button>
+                )}
+                {i.status === "READY" && (
+                  <Button size="sm" variant="outline" className="h-9" onClick={() => setItem(i.id, "READY", "SERVED")}>
+                    <Check /> {o.type === "TAKEAWAY" ? "Diambil" : "Diantar"}
+                  </Button>
+                )}
+              </div>
+            </li>
+          );
+        })}
       </ul>
       {o.note && <p className="mx-4 mb-2 rounded-lg bg-warning/15 px-3 py-2 text-sm text-warning">📝 {o.note}</p>}
       <div className="flex gap-2 p-3">
         {o.status === "CONFIRMED" && (
           <Button className="flex-1" size="lg" onClick={() => move("PREPARING")}>
-            <ChefHat /> Mulai masak
+            <ChefHat /> {p.total > 1 ? "Mulai semua" : "Mulai masak"}
           </Button>
         )}
         {o.status === "PREPARING" && (
           <>
-            <Button variant="secondary" size="icon" className="h-12 w-12" onClick={() => move("CONFIRMED")} aria-label="Kembalikan">
-              <Undo2 />
-            </Button>
+            {p.done === 0 && (
+              <Button variant="secondary" size="icon" className="h-12 w-12" onClick={() => move("CONFIRMED")} aria-label="Kembalikan ke antrean">
+                <Undo2 />
+              </Button>
+            )}
             <Button variant="success" className="flex-1" size="lg" onClick={() => move("READY")}>
-              <HandPlatter /> {allDone ? "Siap diantar" : "Tandai siap"}
+              <CheckCheck /> {p.total > 1 ? "Semua siap" : "Tandai siap"}
             </Button>
           </>
         )}
@@ -229,7 +288,7 @@ function KitchenTicket({ order: o, now }: { order: KOrder; now: number }) {
               <Undo2 />
             </Button>
             <Button variant="outline" className="flex-1" size="lg" onClick={() => move("COMPLETED")}>
-              <Check /> Sudah diantar
+              <CheckCheck /> {p.toServe > 1 ? "Semua sudah diantar" : "Sudah diantar"}
             </Button>
           </>
         )}

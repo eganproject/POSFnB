@@ -89,6 +89,7 @@ export default async function OrderPage({
           quantity: i.quantity,
           lineTotal: i.lineTotal,
           note: i.note,
+          status: i.status,
           modifiers: (i.modifiers as { option: string }[]).map((m) => m.option),
         })),
         payments: order.payments

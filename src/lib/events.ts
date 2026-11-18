@@ -8,6 +8,8 @@ export type RealtimeEvent =
   | { type: "order.created"; orderId: string; source?: string }
   | { type: "order.updated"; orderId: string; status?: string }
   | { type: "payment.updated"; orderId: string }
+  /** Satu / beberapa item siap diantar (sebelum seluruh pesanan siap, atau saat item terakhir siap) */
+  | { type: "items.ready"; orderId: string; queueNumber: number; tableName: string | null; items: string[]; allReady: boolean }
   | { type: "request.created"; requestId: string; tableName: string; kind: string }
   | { type: "request.resolved"; requestId: string }
   | { type: "menu.updated" };

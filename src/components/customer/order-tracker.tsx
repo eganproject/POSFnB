@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import type { OrderStatus, PaymentMethod, PaymentStatus, OrderType } from "@prisma/client";
+import type { OrderItemStatus, OrderStatus, PaymentMethod, PaymentStatus, OrderType } from "@prisma/client";
 import { format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { ArrowLeft, Banknote, Bell, Check, ChefHat, Clock, CreditCard, HandPlatter, PartyPopper, Receipt, UtensilsCrossed, XCircle } from "lucide-react";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 import { cn, formatRupiah, pad } from "@/lib/utils";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { useRealtime } from "@/hooks/use-realtime";
+import { itemProgress, itemStatusLabel } from "@/lib/order-flow";
 import { useSnap } from "@/hooks/use-snap";
 import { Button } from "@/components/ui/button";
 import { DemoPaymentDialog } from "@/components/shared/demo-payment";
@@ -43,7 +44,7 @@ type TrackerOrder = {
   pendingPaymentId: string | null;
   ahead: number;
   etaMinutes: number | null;
-  items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; modifiers: string[] }[];
+  items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; status: OrderItemStatus; modifiers: string[] }[];
   payments: { id: string; method: PaymentMethod; amount: number; gatewayType: string | null }[];
 };
 
@@ -54,6 +55,12 @@ const STEPS: { key: OrderStatus; label: string; icon: typeof Check }[] = [
   { key: "READY", label: "Siap", icon: HandPlatter },
   { key: "COMPLETED", label: "Selesai", icon: PartyPopper },
 ];
+const ITEM_CHIP: Record<OrderItemStatus, string> = {
+  QUEUED: "bg-muted text-muted-foreground",
+  PREPARING: "bg-primary/12 text-primary",
+  READY: "bg-success/15 text-success",
+  SERVED: "bg-muted text-muted-foreground",
+};
 const ORDER_INDEX: Record<OrderStatus, number> = { PENDING: 0, CONFIRMED: 1, PREPARING: 2, READY: 3, COMPLETED: 4, CANCELLED: -1 };
 
 export function OrderTracker({
@@ -78,7 +85,13 @@ export function OrderTracker({
   const autoTried = useRef(false);
   const prevStatus = useRef(order.status);
 
-  useRealtime(`/api/stream/order/${order.id}`);
+  useRealtime(`/api/stream/order/${order.id}`, (msg) => {
+    // Sebagian item siap duluan (bila semuanya siap, notifikasi "Pesananmu sudah siap" yang muncul)
+    if (msg.type === "items.ready" && !msg.allReady && msg.items?.length) {
+      toast.success(`${msg.items.join(", ")} sudah siap${order.type === "DINE_IN" ? ", segera diantar" : ""} 🎉`);
+      navigator.vibrate?.(150);
+    }
+  });
 
   // Perbarui estimasi waktu secara berkala selama pesanan diproses
   useEffect(() => {
@@ -149,6 +162,8 @@ export function OrderTracker({
   }, [autoPay, needsOnlinePay, demo, snap.ready, pay, order.id, router]);
 
   const idx = ORDER_INDEX[order.status];
+  // Status per item hanya bermakna setelah pesanan masuk dapur
+  const showItemStatus = !["PENDING", "CANCELLED"].includes(order.status);
   const cancelled = order.status === "CANCELLED";
   const hero = heroFor(order, needsOnlinePay);
   const menuHref = order.table ? `/t/${order.table.qrToken}` : `/m/${order.outlet.slug}`;
@@ -277,6 +292,12 @@ export function OrderTracker({
                   <p className="font-medium">{i.name}</p>
                   {i.modifiers.length > 0 && <p className="text-xs text-muted-foreground">{i.modifiers.join(", ")}</p>}
                   {i.note && <p className="text-xs italic text-muted-foreground">“{i.note}”</p>}
+                  {showItemStatus && order.status !== "COMPLETED" && (
+                    <span className={cn("mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold", ITEM_CHIP[i.status])}>
+                      {i.status === "PREPARING" && <span className="size-1.5 animate-pulse rounded-full bg-current" />}
+                      {itemStatusLabel(i.status, order.type)}
+                    </span>
+                  )}
                 </div>
                 <span className="tabular">{formatRupiah(i.lineTotal)}</span>
               </li>
@@ -363,15 +384,34 @@ function heroFor(order: TrackerOrder, needsOnlinePay: boolean) {
         : { bg: "bg-gradient-to-br from-[oklch(0.6_0.11_70)] to-honey", icon: Banknote, title: "Menunggu konfirmasi", desc: "Staf akan segera mengonfirmasi pesananmu. Pembayaran dilakukan di kasir." };
     case "CONFIRMED":
       return { bg: "bg-gradient-to-br from-olive-deep to-olive", icon: Clock, title: "Pesanan diterima", desc: "Pesananmu sudah masuk antrean dapur." };
-    case "PREPARING":
-      return { bg: warm, icon: ChefHat, title: "Sedang disiapkan", desc: "Barista dan dapur kami sedang menyiapkan pesananmu." };
-    case "READY":
+    case "PREPARING": {
+      const p = itemProgress(order.items);
+      return {
+        bg: warm,
+        icon: ChefHat,
+        title: p.done > 0 ? `${p.done} dari ${p.total} item siap` : "Sedang disiapkan",
+        desc:
+          p.done > 0
+            ? order.type === "DINE_IN"
+              ? "Item yang sudah siap diantar duluan, sisanya sedang disiapkan."
+              : "Item lainnya masih disiapkan. Tunggu sampai semua siap ya."
+            : "Barista dan dapur kami sedang menyiapkan pesananmu.",
+      };
+    }
+    case "READY": {
+      const p = itemProgress(order.items);
       return {
         bg: "bg-gradient-to-br from-[oklch(0.5_0.1_150)] to-[oklch(0.6_0.11_145)]",
         icon: HandPlatter,
         title: "Pesanan siap!",
-        desc: order.type === "DINE_IN" ? "Pesanan sedang diantar ke mejamu." : "Silakan ambil pesananmu di counter.",
+        desc:
+          order.type === "DINE_IN"
+            ? p.served > 0
+              ? "Sisa pesananmu sedang diantar ke mejamu."
+              : "Pesanan sedang diantar ke mejamu."
+            : "Silakan ambil pesananmu di counter.",
       };
+    }
     case "COMPLETED":
       return { bg: "bg-gradient-to-br from-[oklch(0.5_0.1_150)] to-[oklch(0.6_0.11_145)]", icon: PartyPopper, title: "Selamat menikmati!", desc: "Terima kasih sudah mampir. Sampai jumpa di warm hour berikutnya." };
     case "CANCELLED":

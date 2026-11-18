@@ -17,6 +17,9 @@ export type OrderSummary = {
   place: string;
   outletName: string;
   items: { name: string; quantity: number }[];
+  /** Progres item dapur: jumlah item (baris) yang sudah siap/diantar dari total */
+  itemsDone: number;
+  itemsTotal: number;
   reorderHref?: string | null;
 };
 

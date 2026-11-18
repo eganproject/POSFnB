@@ -17,7 +17,7 @@ function toneFor(o: OrderSummary): Tone {
     case "CONFIRMED":
       return { label: "Diterima", hint: "Masuk antrean dapur", icon: Check, chip: "bg-info/12 text-info", tile: "bg-info/12 text-info", bar: "bg-info" };
     case "PREPARING":
-      return { label: "Sedang disiapkan", hint: "Barista sedang membuat pesananmu", icon: ChefHat, chip: "bg-primary/12 text-primary", tile: "bg-primary/12 text-primary", bar: "bg-primary" };
+      return { label: o.itemsDone > 0 ? `${o.itemsDone} dari ${o.itemsTotal} siap` : "Sedang disiapkan", hint: "Barista sedang membuat pesananmu", icon: ChefHat, chip: "bg-primary/12 text-primary", tile: "bg-primary/12 text-primary", bar: "bg-primary" };
     case "READY":
       return { label: "Siap!", hint: "Sedang diantar / siap diambil", icon: HandPlatter, chip: "bg-success text-white", tile: "bg-success/15 text-success", bar: "bg-success" };
     case "COMPLETED":

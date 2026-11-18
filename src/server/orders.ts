@@ -1,12 +1,21 @@
 import "server-only";
 import crypto from "node:crypto";
-import { Prisma, type OrderStatus, type OrderType, type OrderSource, type PaymentMethod, type PaymentState, type Role } from "@prisma/client";
+import { Prisma, type OrderItemStatus, type OrderStatus, type OrderType, type OrderSource, type PaymentMethod, type PaymentState, type Role } from "@prisma/client";
 import { db } from "@/lib/db";
 import { businessDate, formatRupiah } from "@/lib/utils";
 import { channels, publish } from "@/lib/events";
 import { computeTotals, OrderError, priceLines, type CartLineInput } from "./pricing";
 import { createSnapTransaction, expireTransaction, isMidtransEnabled, isOnlinePaymentAvailable } from "./midtrans";
 import { moneyState } from "@/lib/payment-math";
+import {
+  FlowError,
+  ORDER_TRANSITIONS,
+  assertItemChange,
+  deriveOrderStatus,
+  itemChangesForOrderAction,
+  itemStampsFor,
+  orderStampsFor,
+} from "@/lib/order-flow";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
 function randomCode(len = 4) {
@@ -134,74 +143,169 @@ export async function audit(client: Tx | typeof db, e: AuditEntry) {
   });
 }
 
-const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
-  PENDING: ["CONFIRMED", "CANCELLED"],
-  CONFIRMED: ["PREPARING", "READY", "COMPLETED", "CANCELLED"],
-  PREPARING: ["READY", "CONFIRMED", "CANCELLED"],
-  READY: ["COMPLETED", "PREPARING"],
-  COMPLETED: [],
-  CANCELLED: [],
-};
 
-const STAMP: Partial<Record<OrderStatus, keyof Prisma.OrderUpdateInput>> = {
-  CONFIRMED: "confirmedAt",
-  PREPARING: "preparingAt",
-  READY: "readyAt",
-  COMPLETED: "completedAt",
-};
+/** Kunci pesanan lalu baca beserta item-itemnya: dua staf yang menekan tombol bersamaan tidak saling menimpa. */
+async function lockOrderWithItems(tx: Tx, orderId: string) {
+  await lockOrder(tx, orderId);
+  return tx.order.findUnique({
+    where: { id: orderId },
+    include: { items: { orderBy: { id: "asc" } }, table: { select: { name: true } } },
+  });
+}
+type LockedOrder = NonNullable<Awaited<ReturnType<typeof lockOrderWithItems>>>;
 
+/** Terapkan perubahan status item (+ cap waktunya) di dalam transaksi. */
+async function applyItemChanges(tx: Tx, order: LockedOrder, changes: { id: string; to: OrderItemStatus }[], now: Date) {
+  for (const c of changes) {
+    const item = order.items.find((i) => i.id === c.id)!;
+    await tx.orderItem.update({
+      where: { id: c.id },
+      data: { status: c.to, ...itemStampsFor(c.to, item, now) },
+    });
+    item.status = c.to;
+  }
+}
+
+/**
+ * Hitung ulang status pesanan dari item-itemnya dan simpan bila berubah.
+ * Dipanggil setelah SETIAP perubahan item (status, hapus item, dll.) agar tidak pernah ambigu.
+ */
+async function syncOrderStatus(tx: Tx, order: LockedOrder, now: Date) {
+  const next = deriveOrderStatus(order.status, order.items);
+  if (next === order.status) return order.status;
+  await tx.order.update({ where: { id: order.id }, data: { status: next, ...orderStampsFor(order.status, next, order, now) } });
+  return next;
+}
+
+/** Kirim event realtime setelah transaksi selesai. */
+function announce(order: LockedOrder, prevStatus: OrderStatus, nextStatus: OrderStatus, readied: string[]) {
+  if (readied.length) {
+    const ev = {
+      type: "items.ready" as const,
+      orderId: order.id,
+      queueNumber: order.queueNumber,
+      tableName: order.table?.name ?? null,
+      items: order.items.filter((i) => readied.includes(i.id)).map((i) => `${i.quantity}× ${i.name}`),
+      allReady: nextStatus === "READY",
+    };
+    publish(channels.outlet(order.outletId), ev);
+    publish(channels.order(order.id), ev);
+  }
+  notifyOrder(order.outletId, order.id, nextStatus !== prevStatus ? nextStatus : undefined);
+}
+
+/**
+ * Ubah status pesanan lewat aksi level pesanan.
+ * Untuk tahap dapur, aksi ini diterjemahkan menjadi perubahan status SEMUA item terkait,
+ * lalu status pesanan diturunkan dari item (lihat src/lib/order-flow.ts).
+ */
 export async function setOrderStatus(
   orderId: string,
   next: OrderStatus,
   opts: { role?: Role; reason?: string; outletId?: string; userId?: string } = {}
 ) {
+  const now = new Date();
   const result = await db.$transaction(async (tx) => {
-    await lockOrder(tx, orderId);
-    const order = await tx.order.findUnique({ where: { id: orderId } });
+    const order = await lockOrderWithItems(tx, orderId);
     if (!order) throw new OrderError("Pesanan tidak ditemukan.");
     if (opts.outletId && order.outletId !== opts.outletId) throw new OrderError("Pesanan bukan milik outlet ini.");
-    if (order.status === next) return { order, pendingGateway: [] as string[] };
-    if (!TRANSITIONS[order.status].includes(next)) {
+    const prev = order.status;
+    if (prev === next) return { order, prev, status: prev, readied: [] as string[], pendingGateway: [] as string[] };
+    if (!ORDER_TRANSITIONS[prev].includes(next)) {
       throw new OrderError("Status pesanan tidak bisa diubah ke tahap tersebut.");
     }
-    if (order.status === "PENDING" && next === "CONFIRMED" && opts.role === "DAPUR") {
+    if (prev === "PENDING" && next === "CONFIRMED" && opts.role === "DAPUR") {
       throw new OrderError("Pesanan baru harus dikonfirmasi kasir / pelayan dulu.");
     }
-    if (next === "CANCELLED" && order.paymentStatus !== "UNPAID" && opts.role !== "OWNER") {
-      throw new OrderError("Pesanan yang sudah dibayar hanya bisa dibatalkan oleh owner.");
-    }
-    if (next === "CANCELLED" && !opts.reason?.trim()) {
-      throw new OrderError("Isi alasan pembatalan.");
-    }
-    const data: Prisma.OrderUpdateInput = { status: next };
-    const stamp = STAMP[next];
-    if (stamp) (data as Record<string, unknown>)[stamp] = new Date();
-    if (next === "CANCELLED") data.cancelReason = opts.reason?.trim() ?? null;
-    if (next === "READY" || next === "COMPLETED") {
-      await tx.orderItem.updateMany({ where: { orderId }, data: { isDone: true } });
-    }
-    let updated = await tx.order.update({ where: { id: orderId }, data });
-    let pendingGateway: string[] = [];
     if (next === "CANCELLED") {
+      if (order.paymentStatus !== "UNPAID" && opts.role !== "OWNER") {
+        throw new OrderError("Pesanan yang sudah dibayar hanya bisa dibatalkan oleh owner.");
+      }
+      if (!opts.reason?.trim()) throw new OrderError("Isi alasan pembatalan.");
+      // Status item dibiarkan sebagai riwayat dapur; pesanan batal tidak diturunkan dari item
+      await tx.order.update({ where: { id: orderId }, data: { status: "CANCELLED", cancelReason: opts.reason.trim() } });
       const pending = await tx.payment.findMany({ where: { orderId, state: "PENDING" } });
-      pendingGateway = pending.flatMap((p) => (p.method === "MIDTRANS" && p.gatewayOrderId ? [p.gatewayOrderId] : []));
+      const pendingGateway = pending.flatMap((p) => (p.method === "MIDTRANS" && p.gatewayOrderId ? [p.gatewayOrderId] : []));
       await tx.payment.updateMany({ where: { orderId, state: "PENDING" }, data: { state: "FAILED" } });
       // Uang yang sudah masuk tidak otomatis dianggap kembali: owner mencatat refund-nya
-      updated = (await recalcPaymentTx(tx, orderId)).order;
+      await recalcPaymentTx(tx, orderId);
       await audit(tx, {
         outletId: order.outletId,
         userId: opts.userId,
         action: "ORDER_CANCEL",
         orderId,
-        message: `Pesanan #${order.queueNumber} dibatalkan: ${opts.reason?.trim()}`,
+        message: `Pesanan #${order.queueNumber} dibatalkan: ${opts.reason.trim()}`,
         detail: { total: order.total, paymentStatus: order.paymentStatus },
       });
+      return { order, prev, status: "CANCELLED" as OrderStatus, readied: [] as string[], pendingGateway };
     }
-    return { order: updated, pendingGateway };
+    if (prev === "PENDING") {
+      // Konfirmasi: masuk antrean dapur, semua item tetap Antre
+      await tx.order.update({ where: { id: orderId }, data: { status: "CONFIRMED", confirmedAt: order.confirmedAt ?? now } });
+      return { order, prev, status: "CONFIRMED" as OrderStatus, readied: [] as string[], pendingGateway: [] as string[] };
+    }
+    let changes;
+    try {
+      changes = itemChangesForOrderAction(prev, next, order.items);
+    } catch (e) {
+      if (e instanceof FlowError) throw new OrderError(e.message);
+      throw e;
+    }
+    await applyItemChanges(tx, order, changes, now);
+    const status = await syncOrderStatus(tx, order, now);
+    return { order, prev, status, readied: changes.filter((c) => c.to === "READY").map((c) => c.id), pendingGateway: [] as string[] };
   });
   for (const id of result.pendingGateway) await expireTransaction(id);
-  notifyOrder(result.order.outletId, result.order.id, next);
-  return result.order;
+  announce(result.order, result.prev, result.status, result.readied);
+  return { ...result.order, status: result.status };
+}
+
+/**
+ * Ubah status satu atau beberapa item (layar dapur / halaman Pesanan).
+ * `expected` (opsional) = status item yang dilihat staf di layar; bila sudah berubah oleh staf lain,
+ * aksi ditolak agar tidak menimpa (mis. dua orang menekan "Siap" dan "Antar" bersamaan).
+ */
+export async function setItemStatus(
+  input: { orderId: string; itemIds: string[]; to: OrderItemStatus; expected?: OrderItemStatus },
+  opts: { outletId?: string } = {}
+) {
+  const now = new Date();
+  const result = await db.$transaction(async (tx) => {
+    const order = await lockOrderWithItems(tx, input.orderId);
+    if (!order) throw new OrderError("Pesanan tidak ditemukan.");
+    if (opts.outletId && order.outletId !== opts.outletId) throw new OrderError("Pesanan bukan milik outlet ini.");
+    const prev = order.status;
+    const changes: { id: string; to: OrderItemStatus }[] = [];
+    for (const id of new Set(input.itemIds)) {
+      const item = order.items.find((i) => i.id === id);
+      if (!item) throw new OrderError("Item tidak ditemukan di pesanan ini.");
+      if (input.expected && item.status !== input.expected) {
+        throw new OrderError("Status item sudah diubah staf lain. Layar diperbarui.");
+      }
+      try {
+        if (assertItemChange(prev, item.status, input.to)) changes.push({ id, to: input.to });
+      } catch (e) {
+        if (e instanceof FlowError) throw new OrderError(e.message);
+        throw e;
+      }
+    }
+    await applyItemChanges(tx, order, changes, now);
+    const status = await syncOrderStatus(tx, order, now);
+    return { order, prev, status, readied: input.to === "READY" ? changes.map((c) => c.id) : [] };
+  });
+  announce(result.order, result.prev, result.status, result.readied);
+  return { status: result.status };
+}
+
+/**
+ * Setelah item dihapus / dikurangi, status pesanan dihitung ulang
+ * (mis. item terakhir yang belum siap dihapus → pesanan jadi Siap).
+ */
+export async function resyncOrderStatus(tx: Tx, orderId: string) {
+  const order = await lockOrderWithItems(tx, orderId);
+  if (!order) return null;
+  const status = await syncOrderStatus(tx, order, new Date());
+  return { order, prev: order.status, status };
 }
 
 export function notifyOrder(outletId: string, orderId: string, status?: string) {
