@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { applyGatewayState } from "@/server/orders";
 import { mapMidtransState, verifySignature, type MidtransStatus } from "@/server/midtrans";
+import { getMidtransConfig } from "@/server/settings";
 
 export const runtime = "nodejs";
 
@@ -11,7 +12,7 @@ export const runtime = "nodejs";
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as MidtransStatus | null;
   if (!body?.order_id) return Response.json({ message: "invalid payload" }, { status: 400 });
-  if (!verifySignature(body)) return Response.json({ message: "invalid signature" }, { status: 403 });
+  if (!verifySignature(body, (await getMidtransConfig()).serverKey)) return Response.json({ message: "invalid signature" }, { status: 403 });
 
   const payment = await db.payment.findUnique({ where: { gatewayOrderId: body.order_id } });
   if (!payment) return Response.json({ message: "ok (unknown order)" });

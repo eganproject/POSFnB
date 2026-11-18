@@ -15,7 +15,7 @@ export async function POST(_req: Request, { params }: { params: Promise<{ id: st
   if (!payment || payment.method !== "MIDTRANS" || !payment.gatewayOrderId) {
     return Response.json({ state: "UNKNOWN" }, { status: 404 });
   }
-  if (payment.state !== "PENDING" || !isMidtransEnabled()) {
+  if (payment.state !== "PENDING" || !(await isMidtransEnabled())) {
     return Response.json({ state: payment.state });
   }
   try {

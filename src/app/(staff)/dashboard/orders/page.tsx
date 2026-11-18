@@ -1,4 +1,5 @@
 import type { Prisma } from "@prisma/client";
+import { pickupLabel } from "@/lib/pickup-label";
 import { db } from "@/lib/db";
 import { expireStaleOrders } from "@/server/orders";
 import { requireOutlet, requireUser } from "@/lib/session";
@@ -60,6 +61,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     customerName: o.customerName,
     note: o.note,
     tableName: o.table?.name ?? null,
+    pickupLabel: pickupLabel(o.pickupAt),
     total: o.total,
     subtotal: o.subtotal,
     discount: o.discount,

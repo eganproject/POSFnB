@@ -23,6 +23,7 @@ type TrackerOrder = {
   paymentStatus: PaymentStatus;
   payPreference: PaymentMethod | null;
   type: OrderType;
+  pickupLabel: string | null;
   customerName: string | null;
   note: string | null;
   subtotal: number;
@@ -175,6 +176,7 @@ export function OrderTracker({
               <p className="text-xs text-white/70">
                 {order.code} · {order.table ? order.table.name : "Takeaway"}
               </p>
+              {!order.table && order.pickupLabel && <p className="pt-1 text-sm font-semibold">🛍️ Ambil jam {order.pickupLabel}</p>}
             </div>
             <div className={cn("grid size-16 place-items-center rounded-2xl bg-white/20 backdrop-blur", !cancelled && order.status !== "COMPLETED" && "animate-pulse-ring")}>
               <hero.icon className="size-8" />
@@ -209,7 +211,7 @@ export function OrderTracker({
             <Button size="xl" className="w-full" loading={paying} onClick={pay} disabled={!demo && !snap.ready}>
               Bayar sekarang
             </Button>
-            {order.status === "PENDING" && (
+            {order.status === "PENDING" && !order.pickupLabel && (
               <button
                 onClick={async () => {
                   const r = await switchToCashier(order.id);

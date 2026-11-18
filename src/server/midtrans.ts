@@ -1,20 +1,25 @@
 import "server-only";
 import crypto from "node:crypto";
 import type { PaymentState } from "@prisma/client";
+import { getMidtransConfig } from "./settings";
 
-const isProd = process.env.MIDTRANS_IS_PRODUCTION === "true";
-const SNAP_URL = isProd
-  ? "https://app.midtrans.com/snap/v1/transactions"
-  : "https://app.sandbox.midtrans.com/snap/v1/transactions";
-const CORE_URL = isProd ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com";
+const snapUrl = (prod: boolean) =>
+  prod ? "https://app.midtrans.com/snap/v1/transactions" : "https://app.sandbox.midtrans.com/snap/v1/transactions";
+const coreUrl = (prod: boolean) => (prod ? "https://api.midtrans.com" : "https://api.sandbox.midtrans.com");
 
-export function isMidtransEnabled() {
-  return Boolean(process.env.MIDTRANS_SERVER_KEY && process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY);
+/** Key Midtrans diambil dari Pengaturan (dashboard) atau .env. Kosong = mode demo. */
+export async function isMidtransEnabled() {
+  return (await getMidtransConfig()).enabled;
 }
 
-function authHeader() {
-  const key = process.env.MIDTRANS_SERVER_KEY ?? "";
-  return "Basic " + Buffer.from(`${key}:`).toString("base64");
+/** Data untuk memuat Snap di browser (client key boleh publik) */
+export async function getSnapClientConfig() {
+  const c = await getMidtransConfig();
+  return { demo: !c.enabled, clientKey: c.clientKey, isProduction: c.isProduction };
+}
+
+function authHeader(serverKey: string) {
+  return "Basic " + Buffer.from(`${serverKey}:`).toString("base64");
 }
 
 export type SnapParams = {
@@ -27,12 +32,13 @@ export type SnapParams = {
 };
 
 export async function createSnapTransaction(p: SnapParams) {
-  const res = await fetch(SNAP_URL, {
+  const cfg = await getMidtransConfig();
+  const res = await fetch(snapUrl(cfg.isProduction), {
     method: "POST",
     headers: {
       Accept: "application/json",
       "Content-Type": "application/json",
-      Authorization: authHeader(),
+      Authorization: authHeader(cfg.serverKey),
     },
     body: JSON.stringify({
       transaction_details: { order_id: p.orderId, gross_amount: p.amount },
@@ -70,8 +76,9 @@ export type MidtransStatus = {
 };
 
 export async function getTransactionStatus(orderId: string): Promise<MidtransStatus | null> {
-  const res = await fetch(`${CORE_URL}/v2/${encodeURIComponent(orderId)}/status`, {
-    headers: { Accept: "application/json", Authorization: authHeader() },
+  const cfg = await getMidtransConfig();
+  const res = await fetch(`${coreUrl(cfg.isProduction)}/v2/${encodeURIComponent(orderId)}/status`, {
+    headers: { Accept: "application/json", Authorization: authHeader(cfg.serverKey) },
     cache: "no-store",
   });
   const json = (await res.json().catch(() => null)) as MidtransStatus | null;
@@ -79,8 +86,9 @@ export async function getTransactionStatus(orderId: string): Promise<MidtransSta
   return json;
 }
 
-export function verifySignature(n: MidtransStatus) {
-  const key = process.env.MIDTRANS_SERVER_KEY ?? "";
+export function verifySignature(n: MidtransStatus, serverKey: string) {
+  const key = serverKey;
+  if (!key) return false;
   const expected = crypto
     .createHash("sha512")
     .update(`${n.order_id}${n.status_code}${n.gross_amount}${key}`)

@@ -6,6 +6,10 @@ import { cartLineSchema, OrderError } from "@/server/pricing";
 import { applyGatewayState, createGatewayPayment, createOrder } from "@/server/orders";
 import { isMidtransEnabled } from "@/server/midtrans";
 import { rateLimit } from "@/lib/rate-limit";
+import { getCurrentCustomer } from "@/lib/session";
+import { canOrderAsap, isValidPickup } from "@/lib/pickup";
+
+const TZ = process.env.APP_TIMEZONE || "Asia/Jakarta";
 
 const TOO_MANY = "Terlalu banyak permintaan. Tunggu sebentar lalu coba lagi.";
 
@@ -25,6 +29,8 @@ const placeOrderSchema = z.object({
   customerPhone: z.string().trim().max(20).optional().nullable(),
   note: z.string().trim().max(300).optional().nullable(),
   payMethod: z.enum(["ONLINE", "CASHIER"]),
+  /** Jam ambil takeaway (ISO). null = secepatnya */
+  pickupAt: z.string().max(40).nullable().optional(),
   lines: z.array(cartLineSchema).min(1, "Keranjang masih kosong.").max(50),
 });
 
@@ -42,6 +48,22 @@ export async function placeOrder(
       }
       tableId = table.id;
     }
+    let pickupAt: Date | null = null;
+    if (!tableId) {
+      const outlet = await db.outlet.findUnique({ where: { id: data.outletId } });
+      if (!outlet || !outlet.isActive) throw new OrderError("Outlet sedang tidak menerima pesanan.");
+      if (!outlet.takeawayEnabled) throw new OrderError("Pesanan takeaway sedang tidak tersedia di outlet ini.");
+      const hours = { openTime: outlet.openTime, closeTime: outlet.closeTime, leadMinutes: outlet.takeawayLeadMinutes };
+      const now = new Date();
+      if (data.pickupAt) {
+        pickupAt = new Date(data.pickupAt);
+        if (!isValidPickup(pickupAt, now, hours, TZ)) throw new OrderError("Jam ambil tidak tersedia. Pilih jam lain.");
+        if (data.payMethod !== "ONLINE") throw new OrderError("Pesanan dengan jam ambil terjadwal harus dibayar online.");
+      } else if (!canOrderAsap(now, hours, TZ)) {
+        throw new OrderError(`Outlet sedang tutup (buka ${outlet.openTime}–${outlet.closeTime}). Pilih jam ambil lain.`);
+      }
+    }
+    const customer = await getCurrentCustomer();
     const order = await createOrder({
       outletId: data.outletId,
       tableId,
@@ -52,6 +74,8 @@ export async function placeOrder(
       customerPhone: data.customerPhone,
       note: data.note,
       payPreference: data.payMethod === "ONLINE" ? "MIDTRANS" : null,
+      customerId: customer?.id ?? null,
+      pickupAt,
     });
     if (data.payMethod === "ONLINE") {
       try {
@@ -84,7 +108,7 @@ export async function startOnlinePayment(
       data: {
         paymentId: payment.id,
         token: payment.snapToken!,
-        demo: !isMidtransEnabled(),
+        demo: !(await isMidtransEnabled()),
         redirectUrl: payment.snapRedirectUrl,
       },
     };
@@ -97,6 +121,7 @@ export async function switchToCashier(orderId: string): Promise<ActionResult> {
   try {
     const order = await db.order.findUnique({ where: { id: orderId } });
     if (!order || order.status !== "PENDING") throw new OrderError("Pesanan tidak bisa diubah.");
+    if (order.pickupAt) throw new OrderError("Pesanan takeaway terjadwal harus dibayar online.");
     await db.order.update({ where: { id: orderId }, data: { payPreference: null } });
     await db.payment.updateMany({ where: { orderId, state: "PENDING", method: "MIDTRANS" }, data: { state: "FAILED" } });
     publish(channels.outlet(order.outletId), { type: "order.updated", orderId });
@@ -110,7 +135,7 @@ export async function switchToCashier(orderId: string): Promise<ActionResult> {
 /** Hanya untuk MODE DEMO (tanpa key Midtrans) */
 export async function simulatePayment(paymentId: string, success: boolean): Promise<ActionResult> {
   try {
-    if (isMidtransEnabled()) throw new OrderError("Simulasi hanya tersedia di mode demo.");
+    if (await isMidtransEnabled()) throw new OrderError("Simulasi hanya tersedia di mode demo.");
     const payment = await db.payment.findUnique({ where: { id: paymentId } });
     if (!payment || payment.method !== "MIDTRANS") throw new OrderError("Pembayaran tidak ditemukan.");
     await applyGatewayState(paymentId, success ? "SUCCESS" : "FAILED", { simulated: true }, "demo_qris");

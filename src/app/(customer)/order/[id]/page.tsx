@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { isMidtransEnabled } from "@/server/midtrans";
+import { getSnapClientConfig } from "@/server/midtrans";
+import { pickupLabel } from "@/lib/pickup-label";
 import { OrderTracker } from "@/components/customer/order-tracker";
 
 export const dynamic = "force-dynamic";
@@ -47,12 +48,13 @@ export default async function OrderPage({
     etaMinutes = Math.max(2, Math.round(avg + ahead * avg * 0.35 - elapsed));
   }
   const pending = order.payments.findLast((p) => p.method === "MIDTRANS" && p.state === "PENDING");
+  const snap = await getSnapClientConfig();
   return (
     <OrderTracker
       autoPay={pay === "1"}
-      demo={!isMidtransEnabled()}
-      clientKey={process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY ?? ""}
-      isProduction={process.env.MIDTRANS_IS_PRODUCTION === "true"}
+      demo={snap.demo}
+      clientKey={snap.clientKey}
+      isProduction={snap.isProduction}
       order={{
         id: order.id,
         code: order.code,
@@ -61,6 +63,7 @@ export default async function OrderPage({
         paymentStatus: order.paymentStatus,
         payPreference: order.payPreference,
         type: order.type,
+        pickupLabel: pickupLabel(order.pickupAt),
         customerName: order.customerName,
         note: order.note,
         subtotal: order.subtotal,

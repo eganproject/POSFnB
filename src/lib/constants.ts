@@ -5,7 +5,12 @@ export const ROLE_LABEL: Record<Role, string> = {
   KASIR: "Kasir",
   DAPUR: "Dapur",
   PELAYAN: "Pelayan",
+  CUSTOMER: "Pelanggan",
 };
+
+/** Peran yang bisa dipilih owner saat menambah staf */
+export const STAFF_ROLES = ["OWNER", "KASIR", "DAPUR", "PELAYAN"] as const;
+export type StaffRole = (typeof STAFF_ROLES)[number];
 
 export const ORDER_STATUS_LABEL: Record<OrderStatus, string> = {
   PENDING: "Menunggu",
@@ -37,4 +42,5 @@ export const ROLE_HOME: Record<Role, string> = {
   KASIR: "/pos",
   DAPUR: "/kitchen",
   PELAYAN: "/dashboard/orders",
+  CUSTOMER: "/akun",
 };

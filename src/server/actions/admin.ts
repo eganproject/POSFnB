@@ -44,6 +44,10 @@ const outletSchema = z.object({
   serviceRate: z.number().min(0).max(30),
   receiptFooter: z.string().trim().max(200).optional().nullable(),
   isActive: z.boolean(),
+  takeawayEnabled: z.boolean().optional(),
+  openTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format jam buka HH:MM").optional(),
+  closeTime: z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/, "Format jam tutup HH:MM").optional(),
+  takeawayLeadMinutes: z.number().int().min(5, "Waktu siap minimal 5 menit").max(180).optional(),
 });
 
 export async function saveOutlet(input: z.input<typeof outletSchema>): Promise<Result<{ id: string }>> {
@@ -51,8 +55,10 @@ export async function saveOutlet(input: z.input<typeof outletSchema>): Promise<R
     await owner();
     const { id, ...d } = outletSchema.parse(input);
     const data = { ...d, slug: slugify(d.slug || d.name) || qrToken().toLowerCase() };
+    if (data.openTime && data.closeTime && data.openTime === data.closeTime) throw new Error("Jam buka dan jam tutup tidak boleh sama.");
     const outlet = id ? await db.outlet.update({ where: { id }, data }) : await db.outlet.create({ data });
     revalidatePath("/dashboard", "layout");
+    revalidatePath("/m/[slug]", "page");
     return ok({ id: outlet.id });
   } catch (e) {
     return fail(e);
@@ -290,6 +296,8 @@ export async function saveUser(input: z.input<typeof userSchema>): Promise<Resul
     if (id === me.id && (data.role !== "OWNER" || !data.isActive)) throw new Error("Anda tidak bisa menurunkan role / menonaktifkan akun sendiri.");
     const outletId = data.role === "OWNER" ? null : data.outletId;
     if (id) {
+      const target = await db.user.findUnique({ where: { id } });
+      if (!target || target.role === "CUSTOMER") throw new Error("Pengguna tidak ditemukan.");
       await db.user.update({ where: { id }, data: { ...data, outletId } });
       if (password) {
         if (password.length < 6) throw new Error("Password minimal 6 karakter");
@@ -299,6 +307,22 @@ export async function saveUser(input: z.input<typeof userSchema>): Promise<Resul
       if (!data.isActive) await db.session.deleteMany({ where: { userId: id } });
     } else {
       if (!password || password.length < 6) throw new Error("Password minimal 6 karakter");
+      // Email ini sudah dipakai pelanggan (login Google)? Jadikan staf, riwayat pesanannya tetap.
+      const existing = await db.user.findUnique({ where: { email: data.email } });
+      if (existing) {
+        if (existing.role !== "CUSTOMER") throw new Error("Email ini sudah terdaftar sebagai staf.");
+        const hashed = await hashPassword(password);
+        await db.$transaction([
+          db.user.update({ where: { id: existing.id }, data: { ...data, outletId, emailVerified: true } }),
+          db.account.deleteMany({ where: { userId: existing.id, providerId: "credential" } }),
+          db.account.create({
+            data: { id: crypto.randomBytes(16).toString("hex"), userId: existing.id, accountId: existing.id, providerId: "credential", password: hashed },
+          }),
+          db.session.deleteMany({ where: { userId: existing.id } }),
+        ]);
+        revalidatePath("/dashboard/users");
+        return ok(undefined);
+      }
       const userId = crypto.randomBytes(16).toString("hex");
       await db.$transaction([
         db.user.create({ data: { id: userId, ...data, outletId, emailVerified: true } }),

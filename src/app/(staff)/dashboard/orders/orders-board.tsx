@@ -29,6 +29,8 @@ export type BoardOrder = {
   customerName: string | null;
   note: string | null;
   tableName: string | null;
+  /** Jam ambil takeaway terjadwal, mis. "14:30" */
+  pickupLabel?: string | null;
   total: number;
   subtotal: number;
   discount: number;
@@ -192,7 +194,7 @@ function OrderCard({ order: o, href }: { order: BoardOrder; href: string }) {
         <div className="flex items-center gap-3">
           <span className="grid size-12 place-items-center rounded-xl bg-muted text-lg font-extrabold tabular">#{pad(o.queueNumber)}</span>
           <div>
-            <p className="font-semibold">{o.tableName ?? "Takeaway"}</p>
+            <p className="font-semibold">{o.tableName ?? (o.pickupLabel ? `Takeaway · ambil ${o.pickupLabel}` : "Takeaway")}</p>
             <p className="text-xs text-muted-foreground">{o.customerName || "Tanpa nama"}</p>
           </div>
         </div>
@@ -256,7 +258,7 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
           <span className="grid size-14 place-items-center rounded-2xl bg-primary/10 text-xl font-extrabold text-primary tabular">#{pad(o.queueNumber)}</span>
           <div className="space-y-1">
             <DialogTitle className="text-lg font-bold">
-              {o.tableName ?? "Takeaway"} · {o.customerName || "Tanpa nama"}
+              {o.tableName ?? (o.pickupLabel ? `Takeaway · ambil ${o.pickupLabel}` : "Takeaway")} · {o.customerName || "Tanpa nama"}
             </DialogTitle>
             <div className="flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
               <OrderStatusBadge status={o.status} />
