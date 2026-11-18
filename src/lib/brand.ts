@@ -1,39 +1,44 @@
 /**
  * Identitas outlet yang tampil di website, menu customer, struk, dan layar staf.
- * Ganti isi file ini (dan foto di /public/warmhour) untuk memakai aplikasi di brand lain.
+ * Ganti isi file ini (dan foto di /public/amalgam) untuk memakai aplikasi di brand lain.
  */
 export const BRAND = {
-  name: "Warm Hour Cafe",
-  shortName: "Warm Hour",
-  tagline: "a neighborhood cafe",
-  description: "Kopi, matcha, roti cocol, dan salt bread di Duri Pulo, Jakarta Pusat. Pesan langsung dari meja lewat QR.",
-  address: "No.11 Blok A1, Jl. KH. Moh. Mansyur, RT.15/RW.4, Duri Pulo, Gambir, Jakarta Pusat 10140",
-  area: "Duri Pulo, Gambir",
-  hours: "Setiap hari, 07.30 – 21.00",
-  hoursShort: "07.30 – 21.00",
-  priceRange: "Rp 50–75 rb per orang",
-  rating: { score: "4,7", count: 64 },
+  name: "Amalgam Coffee Brewery",
+  shortName: "Amalgam",
+  tagline: "Coffee · Dining · Private Room",
+  description:
+    "Kopi roasting sendiri, brunch, masakan Nusantara, dan seafood di Kebon Sirih, Menteng. Pesan langsung dari meja lewat QR.",
+  address: "Jl. Kebon Sirih No.39, RT.14/RW.2, Kebon Sirih, Menteng, Jakarta Pusat 10340",
+  area: "Kebon Sirih, Menteng",
+  hours: "Setiap hari, 07.00 – 22.00",
+  hoursShort: "07.00 – 22.00",
+  priceRange: "Rp 100–200 rb per orang",
+  rating: { score: "4,4", count: 757 },
   links: {
-    maps: "https://maps.app.goo.gl/hyFFEfSgGyvhn1Fz6",
-    instagram: "https://www.instagram.com/cafe_by_warmhour/",
-    instagramHandle: "@cafe_by_warmhour",
-    grabfood: "https://r.grab.com/g/2-1-6-C8DDGUABSFCUG2",
-    customCake: "https://www.instagram.com/warmhour__",
+    maps: "https://maps.app.goo.gl/YuznGXshomQBCjku9",
+    instagram: "https://www.instagram.com/amalgam.kebonsirih/",
+    instagramHandle: "@amalgam.kebonsirih",
+    tiktok: "https://www.tiktok.com/@amalgam.kebonsirih",
+    website: "https://amalgamcoffee.com/",
+    reservation: "https://wa.me/6281932400777?text=Halo%20Amalgam%2C%20saya%20ingin%20melakukan%20reservasi%20meja",
   },
-  /** Warna tema browser/PWA (hijau zaitun dari papan menu) */
-  themeColor: "#66694f",
-  backgroundColor: "#fbf6ea",
+  /** Warna tema browser/PWA (hijau botol dari buku menu) */
+  themeColor: "#085030",
+  backgroundColor: "#f3f1ea",
   poweredBy: "Santap POS",
 } as const;
 
 export const BRAND_PHOTOS = {
-  front: "/warmhour/front.jpg",
-  interior: ["/warmhour/interior-1.jpg", "/warmhour/interior-2.jpg", "/warmhour/interior-3.jpg", "/warmhour/interior-4.jpg"],
-  display: "/warmhour/display.jpg",
+  front: "/amalgam/front.jpg",
+  storefront: "/amalgam/storefront.jpg",
+  interior: ["/amalgam/interior-1.jpg", "/amalgam/interior-2.jpg", "/amalgam/interior-3.jpg"],
+  logoGreen: "/amalgam/logo-green.png",
+  logoCream: "/amalgam/logo-cream.png",
 } as const;
 
+/** Cuplikan ulasan asli di Google Maps (November 2026). */
 export const BRAND_REVIEWS = [
-  { quote: "Salah satu kafe yang sangat worth to visit buat menikmati suasana tenang.", by: "Ulasan Google" },
-  { quote: "Tahu rempahnya mantep banget, ditambah manis-manis matcha & roti cocol.", by: "Ulasan Google" },
-  { quote: "Their roti, cakes and salt bread are god tier level.", by: "Ulasan Google" },
+  { quote: "Tempatnya enak apalagi buat meeting, fasilitas yang tersedia sangat baik.", by: "Ulasan Google" },
+  { quote: "Aku coba yang pineapple, seger asemnya dapet tapi rasa kopinya tetap ada.", by: "Ulasan Google" },
+  { quote: "Tempat yang saya datangi lagi ketika belum tahu mau mampir ngopi di mana.", by: "Ulasan Google" },
 ] as const;

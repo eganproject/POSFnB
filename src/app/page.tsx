@@ -11,9 +11,14 @@ import { ProductImage } from "@/components/shared/product-image";
 
 export const dynamic = "force-dynamic";
 
+const COFFEE = {
+  origins: ["Gayo", "Garut", "Gunung Halu", "Ijen", "Kerinci", "Puntang"],
+  blend: "70% Arabica, 30% Robusta. Dasar untuk espresso, latte, dan signature coffee.",
+};
+
 const STEPS = [
   { title: "Scan QR di meja", desc: "Setiap meja punya QR sendiri. Menu terbuka di HP tanpa install aplikasi." },
-  { title: "Pilih & bayar", desc: "Atur hot atau ice, cocolan, sampai level pedas. Bayar QRIS di HP atau di kasir." },
+  { title: "Pilih & bayar", desc: "Atur hot atau iced, susu Greenfields atau Oatly, sampai pilihan saus. Bayar QRIS di HP atau di kasir." },
   { title: "Pantau pesanan", desc: "Status dari bar dan dapur tampil langsung, sampai pesanan diantar ke mejamu." },
 ];
 
@@ -41,12 +46,13 @@ export default async function Home() {
       {/* Header */}
       <header className="sticky top-0 z-30 border-b border-olive-deep/20 bg-olive text-cream">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5">
-          <Link href="/" className="flex items-center gap-2.5">
-            <BrandMark className="size-8" />
-            <span className="font-display text-2xl leading-none tracking-wide">{BRAND.shortName}</span>
+          <Link href="/" className="flex items-center" aria-label={BRAND.name}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND_PHOTOS.logoCream} alt={BRAND.name} className="h-7 w-auto sm:h-8" />
           </Link>
           <nav className="hidden items-center gap-8 text-sm text-cream/75 md:flex">
             <a href="#favorit" className="transition hover:text-cream">Favorit</a>
+            <a href="#kopi" className="transition hover:text-cream">Kopi</a>
             <a href="#ruang" className="transition hover:text-cream">Ruang</a>
             <a href="#pesan" className="transition hover:text-cream">Cara pesan</a>
             <a href="#kunjungi" className="transition hover:text-cream">Kunjungi</a>
@@ -73,13 +79,16 @@ export default async function Home() {
         <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 pb-16 pt-10 sm:pt-14 lg:grid-cols-[1.05fr_1fr] lg:gap-14 lg:pb-20">
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cream/70">{BRAND.tagline}</p>
-            <h1 className="mt-4 font-display text-[clamp(4rem,13vw,8.5rem)] leading-[0.88]">
-              Warm
-              <br />
-              Hour
+            <h1 className="mt-6">
+              <span className="sr-only">{BRAND.name}</span>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={BRAND_PHOTOS.logoCream} alt="" className="w-full max-w-[26rem]" />
             </h1>
-            <p className="mt-5 max-w-md font-serif text-2xl italic leading-snug text-cream/90">
-              Kopi, matcha, roti cocol &amp; salt bread, untuk jam-jam yang ingin dinikmati pelan-pelan.
+            <p className="mt-7 max-w-md font-serif text-[1.65rem] italic leading-snug text-cream/90">
+              Tempat waktu berjalan pelan, seperti Minggu pagi yang tenang.
+            </p>
+            <p className="mt-3 max-w-md leading-relaxed text-cream/70">
+              Kopi yang kami roasting sendiri, brunch sepanjang hari, masakan Nusantara, sampai seafood untuk makan bersama.
             </p>
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
@@ -111,24 +120,24 @@ export default async function Home() {
               </div>
               <div>
                 <dt className="text-cream/60">Lokasi</dt>
-                <dd className="mt-1 font-semibold">Duri Pulo</dd>
+                <dd className="mt-1 font-semibold">Kebon Sirih</dd>
               </div>
             </dl>
           </div>
 
           {/* Kolase foto */}
           <div className="relative mx-auto w-full max-w-md lg:max-w-none">
-            <Photo src={BRAND_PHOTOS.interior[0]} alt="Ruang dalam Warm Hour Cafe" className="aspect-[4/5] w-[78%] rounded-[2rem]" eager />
+            <Photo src={BRAND_PHOTOS.front} alt="Rumah kaca berangka hijau di depan Amalgam" className="aspect-[4/5] w-[78%] rounded-t-full rounded-b-[2rem]" eager />
             <Photo
-              src="/warmhour/roti-cocol.jpg"
-              alt="Roti cocol dengan aneka cocolan"
+              src="/amalgam/nasi-campur-bali.jpg"
+              alt="Nasi campur Bali dengan sate lilit dan sambal matah"
               className="absolute -bottom-6 right-0 aspect-square w-[46%] rounded-[1.5rem] ring-[6px] ring-olive"
               eager
             />
             <Photo
-              src="/warmhour/matcha-corn-tea.jpg"
-              alt="Matcha Warm Hour"
-              className="absolute right-[4%] top-6 aspect-square w-[32%] rounded-[1.25rem] ring-[6px] ring-olive"
+              src="/amalgam/americano-lemon.jpg"
+              alt="Americano lemon, signature coffee Amalgam"
+              className="absolute right-[4%] top-6 aspect-[3/4] w-[30%] rounded-[1.25rem] ring-[6px] ring-olive"
               eager
             />
           </div>
@@ -162,15 +171,39 @@ export default async function Home() {
         </section>
       )}
 
+      {/* Kopi */}
+      <section id="kopi" className="scroll-mt-20 bg-olive-deep text-cream">
+        <div className="mx-auto grid max-w-6xl items-center gap-10 px-5 py-16 sm:py-20 md:grid-cols-[1fr_1.1fr] md:gap-16">
+          <Photo src="/amalgam/roastery.jpg" alt="Kemasan biji kopi Amalgam Coffee Roastery di depan mesin roasting" className="mx-auto aspect-[4/5] w-full max-w-sm rounded-[2rem]" />
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cream/65">Roasted in Jakarta</p>
+            <h2 className="mt-3 font-display text-5xl leading-[0.95] text-balance sm:text-6xl">Fresh coffee, roasted daily</h2>
+            <p className="mt-5 max-w-md leading-relaxed text-cream/80">
+              Biji kopi kami roasting sendiri setiap hari. Pilih single origin untuk manual brew, atau house blend untuk espresso dan latte.
+            </p>
+            <div className="mt-8 grid gap-6 border-t border-cream/20 pt-6 sm:grid-cols-2">
+              <div>
+                <h3 className="font-serif text-2xl italic">Single origin</h3>
+                <p className="mt-2 text-sm leading-relaxed text-cream/75">{COFFEE.origins.join(" · ")}</p>
+              </div>
+              <div>
+                <h3 className="font-serif text-2xl italic">House blend</h3>
+                <p className="mt-2 text-sm leading-relaxed text-cream/75">{COFFEE.blend}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
       {/* Ruang */}
       <section id="ruang" className="scroll-mt-20 bg-secondary">
         <div className="mx-auto max-w-6xl px-5 py-16 sm:py-20">
-          <SectionHead eyebrow="Ruang" title="Tenang, hangat, dan tidak berdesakan" />
+          <SectionHead eyebrow="Ruang" title="Untuk ngopi, makan, dan meeting" />
           <div className="mt-10 grid grid-cols-2 gap-3 md:grid-cols-4 md:gap-4">
-            <Photo src={BRAND_PHOTOS.front} alt="Tampak depan Warm Hour Cafe" className="aspect-[3/4] rounded-2xl" />
-            <Photo src={BRAND_PHOTOS.interior[1]} alt="Sudut meja dengan lampu hangat" className="aspect-[3/4] rounded-2xl md:mt-8" />
-            <Photo src={BRAND_PHOTOS.display} alt="Etalase kue dan salt bread" className="aspect-[3/4] rounded-2xl" />
-            <Photo src={BRAND_PHOTOS.interior[3]} alt="Deretan meja di dekat jendela" className="aspect-[3/4] rounded-2xl md:mt-8" />
+            <Photo src={BRAND_PHOTOS.interior[1]} alt="Sofa hijau dan dinding keramik hijau" className="aspect-[3/4] rounded-2xl" />
+            <Photo src={BRAND_PHOTOS.interior[0]} alt="Ruang dalam yang terang dengan bar kopi" className="aspect-[3/4] rounded-2xl md:mt-8" />
+            <Photo src={BRAND_PHOTOS.storefront} alt="Tampak depan Amalgam di malam hari" className="aspect-[3/4] rounded-2xl" />
+            <Photo src="/amalgam/veggies.jpg" alt="Aneka tumisan sayur di meja kayu" className="aspect-[3/4] rounded-2xl md:mt-8" />
           </div>
           <div className="mt-12 grid gap-8 md:grid-cols-3">
             {BRAND_REVIEWS.map((r) => (
@@ -254,17 +287,17 @@ export default async function Home() {
               </div>
               <div className="flex items-center justify-between gap-4 border-b border-cream/25 py-3">
                 <dt>Kisaran harga</dt>
-                <dd className="text-right">Rp 50–75 rb</dd>
+                <dd className="text-right">{BRAND.priceRange.replace(" per orang", "")}</dd>
               </div>
               <div className="flex items-center justify-between gap-4 border-b border-cream/25 py-3">
                 <dt>Layanan</dt>
-                <dd className="text-right">Dine in · Takeaway</dd>
+                <dd className="text-right">Dine in · Takeaway · Private room</dd>
               </div>
             </dl>
             <div className="mt-6 flex flex-wrap gap-2.5 text-sm font-semibold">
+              <ExtLink href={BRAND.links.reservation}>Reservasi via WhatsApp</ExtLink>
               <ExtLink href={BRAND.links.instagram}>Instagram {BRAND.links.instagramHandle}</ExtLink>
-              <ExtLink href={BRAND.links.grabfood}>GrabFood</ExtLink>
-              <ExtLink href={BRAND.links.customCake}>Custom cake</ExtLink>
+              <ExtLink href={BRAND.links.tiktok}>TikTok</ExtLink>
             </div>
           </div>
         </div>
@@ -273,7 +306,7 @@ export default async function Home() {
       <footer className="bg-olive-deep text-cream/70">
         <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-3 px-5 py-7 text-sm sm:flex-row">
           <span className="flex items-center gap-2 text-cream">
-            <BrandMark className="size-5" /> <span className="font-display text-lg tracking-wide">{BRAND.name}</span>
+            <BrandMark className="size-5" /> <span className="font-display text-lg">{BRAND.name}</span>
           </span>
           <span className="flex flex-wrap items-center justify-center gap-x-4 gap-y-1">
             <span>Pemesanan meja &amp; kasir oleh {BRAND.poweredBy}</span>

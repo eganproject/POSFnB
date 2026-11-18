@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Cormorant_Garamond, Plus_Jakarta_Sans, Poiret_One } from "next/font/google";
+import { Bodoni_Moda, Plus_Jakarta_Sans } from "next/font/google";
 import { Toaster } from "sonner";
 import { ServiceWorkerRegister } from "@/components/shared/sw-register";
 import { BRAND } from "@/lib/brand";
@@ -11,12 +11,12 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap",
 });
 
-const display = Poiret_One({ subsets: ["latin"], weight: "400", variable: "--font-poiret", display: "swap" });
-const serif = Cormorant_Garamond({
+/** Serif kontras tinggi seperti judul di buku menu Amalgam */
+const bodoni = Bodoni_Moda({
   subsets: ["latin"],
-  weight: ["500", "600"],
+  weight: ["400", "500", "600"],
   style: ["normal", "italic"],
-  variable: "--font-cormorant",
+  variable: "--font-bodoni",
   display: "swap",
 });
 
@@ -39,7 +39,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="id" suppressHydrationWarning>
-      <body className={`${jakarta.variable} ${display.variable} ${serif.variable} font-sans`}>
+      <body className={`${jakarta.variable} ${bodoni.variable} font-sans`}>
         {children}
         <Toaster position="top-center" richColors closeButton />
         <ServiceWorkerRegister />
