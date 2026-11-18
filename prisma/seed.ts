@@ -8,75 +8,145 @@ const token = () => crypto.randomBytes(9).toString("base64url");
 
 type Opt = { name: string; price?: number; default?: boolean };
 type Group = { name: string; min: number; max: number; options: Opt[] };
-type Item = { name: string; price: number; desc: string; emoji?: string; featured?: boolean; groups?: Group[] };
+type Item = { name: string; price: number; desc: string; emoji?: string; image?: string; featured?: boolean; groups?: Group[] };
 
-const suhu: Group = { name: "Suhu", min: 1, max: 1, options: [{ name: "Dingin", default: true }, { name: "Panas" }] };
-const ukuran: Group = { name: "Ukuran", min: 1, max: 1, options: [{ name: "Regular", default: true }, { name: "Large", price: 6000 }] };
-const gula: Group = { name: "Tingkat manis", min: 1, max: 1, options: [{ name: "Normal", default: true }, { name: "Less sugar" }, { name: "Tanpa gula" }] };
-const extraKopi: Group = { name: "Tambahan", min: 0, max: 3, options: [{ name: "Extra shot espresso", price: 6000 }, { name: "Oat milk", price: 8000 }, { name: "Sirup hazelnut", price: 5000 }] };
-const pedas: Group = { name: "Level pedas", min: 1, max: 1, options: [{ name: "Tidak pedas", default: true }, { name: "Sedang" }, { name: "Pedas" }, { name: "Extra pedas", price: 2000 }] };
-const lauk: Group = { name: "Tambahan", min: 0, max: 4, options: [{ name: "Telur ceplok", price: 5000 }, { name: "Kerupuk udang", price: 4000 }, { name: "Sate ayam (3 tusuk)", price: 12000 }, { name: "Nasi tambah", price: 6000 }] };
-const mieTopping: Group = { name: "Topping", min: 0, max: 3, options: [{ name: "Bakso sapi", price: 7000 }, { name: "Pangsit goreng", price: 5000 }, { name: "Telur rebus", price: 5000 }] };
-const saus: Group = { name: "Saus", min: 1, max: 2, options: [{ name: "Saus sambal", default: true }, { name: "Mayones" }, { name: "Keju leleh", price: 5000 }] };
+/**
+ * Menu Warm Hour Cafe, disalin dari MENU.pdf di linktr.ee/warmhourcafe (November 2026).
+ * Harga dalam Rupiah. Foto di /public/warmhour berasal dari profil Google Maps cafe.
+ */
+const K = 1000;
+const img = (name: string) => `/warmhour/${name}.jpg`;
+
+/** Pilihan suhu; harga dasar produk = varian termurah, selisihnya jadi priceDelta. */
+const suhu = (hot: number | null, ice: number | null): Group => {
+  const base = Math.min(...[hot, ice].filter((v): v is number => v !== null));
+  const options: Opt[] = [];
+  if (ice !== null) options.push({ name: "Ice", price: (ice - base) * K, default: true });
+  if (hot !== null) options.push({ name: "Hot", price: (hot - base) * K, default: ice === null });
+  return { name: "Suhu", min: 1, max: 1, options };
+};
+const extraKopi: Group = { name: "Tambahan", min: 0, max: 2, options: [{ name: "Additional shot", price: 10 * K }, { name: "Ganti oat milk", price: 7 * K }] };
+const ceremonial: Group = { name: "Upgrade", min: 0, max: 1, options: [{ name: "Ceremonial matcha", price: 12 * K }] };
+const manis: Group = { name: "Tingkat manis", min: 1, max: 1, options: [{ name: "Normal", default: true }, { name: "Less sweet" }] };
+const COCOLAN = ["Pandan Kaya", "Thai Tea", "Hojicha", "Creamy Milk", "Milo"];
+const roti: Group = { name: "Roti", min: 1, max: 1, options: [{ name: "Kukus", default: true }, { name: "Bakar" }] };
+const cocolan: Group = { name: "Cocolan (termasuk 1)", min: 1, max: 1, options: COCOLAN.map((name, i) => ({ name, default: i === 0 })) };
+const ekstraCocolan: Group = { name: "Ekstra cocolan", min: 0, max: 4, options: COCOLAN.map((name) => ({ name: `Ekstra ${name}`, price: 10 * K })) };
+const telur: Group = { name: "Porsi", min: 1, max: 1, options: [{ name: "1 Egg", default: true }, { name: "2 Eggs", price: 8 * K }] };
+const pedas: Group = { name: "Level pedas", min: 1, max: 1, options: [{ name: "Level 0" }, { name: "Level 1", default: true }, { name: "Level 2" }, { name: "Level 3" }] };
+const protein: Group = { name: "Protein", min: 1, max: 1, options: [{ name: "Chicken", default: true }, { name: "Pork", price: 5 * K }] };
+
+const kopi = (name: string, hot: number | null, ice: number | null, desc: string, extra: Partial<Item> = {}): Item => ({
+  name,
+  emoji: "☕",
+  price: Math.min(...[hot, ice].filter((v): v is number => v !== null)) * K,
+  desc,
+  groups: [suhu(hot, ice), extraKopi],
+  ...extra,
+});
+const matcha = (name: string, price: number, desc: string, extra: Partial<Item> = {}): Item => ({
+  name,
+  emoji: "🍵",
+  price: price * K,
+  desc,
+  groups: [ceremonial, manis],
+  ...extra,
+});
 
 const MENU: { name: string; icon: string; items: Item[] }[] = [
   {
-    name: "Makanan Utama",
-    icon: "🍛",
-    items: [
-      { name: "Nasi Goreng Kampung", emoji: "🍳", price: 32000, desc: "Nasi goreng bumbu terasi, ayam suwir, telur, acar dan kerupuk.", featured: true, groups: [pedas, lauk] },
-      { name: "Ayam Bakar Taliwang", emoji: "🍗", price: 45000, desc: "Ayam kampung bakar bumbu taliwang khas Lombok, plecing kangkung.", featured: true, groups: [pedas, lauk] },
-      { name: "Nasi Ayam Geprek", emoji: "🌶️", price: 28000, desc: "Ayam crispy digeprek sambal bawang, lalapan dan nasi hangat.", groups: [pedas, lauk] },
-      { name: "Sop Buntut", emoji: "🍲", price: 68000, desc: "Buntut sapi empuk dengan kuah bening rempah, wortel dan kentang.", groups: [lauk] },
-      { name: "Beef Rice Bowl", emoji: "🍚", price: 42000, desc: "Irisan sapi teriyaki, onsen egg, dan salad wijen di atas nasi Jepang.", groups: [pedas] },
-    ],
-  },
-  {
-    name: "Mie & Pasta",
-    icon: "🍜",
-    items: [
-      { name: "Mie Ayam Jamur", emoji: "🍜", price: 27000, desc: "Mie kenyal dengan ayam jamur kecap, sawi, dan kuah kaldu.", groups: [mieTopping, pedas] },
-      { name: "Mie Goreng Jawa", emoji: "🍝", price: 30000, desc: "Mie goreng arang dengan bumbu kemiri, ayam dan sayuran.", groups: [pedas, mieTopping] },
-      { name: "Spaghetti Aglio Olio", emoji: "🍤", price: 38000, desc: "Bawang putih, cabai kering, peterseli dan udang.", groups: [pedas] },
-    ],
-  },
-  {
-    name: "Camilan",
-    icon: "🍟",
-    items: [
-      { name: "French Fries", emoji: "🍟", price: 22000, desc: "Kentang goreng renyah dengan bumbu garlic parsley.", groups: [saus] },
-      { name: "Tahu Cabe Garam", emoji: "🧈", price: 20000, desc: "Tahu sutra goreng tepung, tumis cabai dan bawang.", featured: true },
-      { name: "Pisang Goreng Keju", emoji: "🍌", price: 23000, desc: "Pisang kepok goreng, keju parut dan susu kental manis." },
-      { name: "Dimsum Ayam (4 pcs)", emoji: "🥟", price: 25000, desc: "Siomay ayam udang kukus dengan saus chili oil." },
-    ],
-  },
-  {
-    name: "Kopi",
+    name: "Coffee",
     icon: "☕",
     items: [
-      { name: "Es Kopi Susu Gula Aren", emoji: "🧋", price: 24000, desc: "Espresso, susu segar, dan gula aren asli. Andalan kami!", featured: true, groups: [ukuran, gula, extraKopi] },
-      { name: "Americano", emoji: "☕", price: 22000, desc: "Double shot espresso dengan air.", groups: [suhu, ukuran, extraKopi] },
-      { name: "Caffè Latte", emoji: "☕", price: 28000, desc: "Espresso lembut dengan susu steamed.", groups: [suhu, ukuran, gula, extraKopi] },
-      { name: "Kopi Tubruk", emoji: "🫖", price: 15000, desc: "Kopi robusta Temanggung diseduh tradisional.", groups: [gula] },
+      kopi("Montblanc", null, 45, "Kopi dingin dengan krim lembut dan taburan kulit jeruk.", { featured: true, image: img("montblanc") }),
+      kopi("Dirty Latte", null, 45, "Espresso dituang di atas susu dingin.", { featured: true, image: img("dirty-latte") }),
+      kopi("Kopi Susu", null, 30, "Es kopi susu khas Warm Hour.", { image: img("kopi-susu") }),
+      kopi("Espresso", 27, null, "Single origin, diseduh pendek."),
+      kopi("Black", 33, 35, "Espresso dengan air, panas atau dingin.", { image: img("black") }),
+      kopi("White", 36, 42, "Espresso dengan susu steamed."),
+      kopi("Piccolo", 36, null, "Ristretto dengan sedikit susu."),
+      kopi("Cappucino", 36, null, "Espresso, susu, dan foam tebal."),
+      kopi("Magic", 36, null, "Double ristretto dengan susu, gaya Melbourne."),
+      kopi("Dirty Chai", null, 45, "Chai latte dengan satu shot espresso."),
     ],
   },
   {
-    name: "Non-Kopi",
+    name: "Matcha",
+    icon: "🍵",
+    items: [
+      matcha("Matcha Kinako", 47, "Matcha cold-whisked dengan oat milk dan kinako.", { featured: true }),
+      matcha("Matcha Berry", 49, "Matcha cold-whisked dengan oat milk dan saus berry.", { featured: true }),
+      matcha("Matcha Latte", 45, "Matcha cold-whisked dengan oat milk.", { image: img("matcha-latte") }),
+      matcha("Matcha Corn Tea", 47, "Matcha cold-whisked dengan oat milk dan teh jagung.", { image: img("matcha-corn-tea") }),
+      matcha("Dirty Matcha", 49, "Matcha latte dengan satu shot espresso."),
+      { name: "Hojicha Latte", emoji: "🍵", price: 45 * K, desc: "Teh hijau sangrai dengan oat milk, disajikan dingin.", groups: [manis] },
+    ],
+  },
+  {
+    name: "Non-Coffee",
     icon: "🧋",
     items: [
-      { name: "Matcha Latte", emoji: "🍵", price: 30000, desc: "Matcha Jepang premium dengan susu segar.", groups: [suhu, ukuran, gula] },
-      { name: "Es Teh Leci", emoji: "🥤", price: 20000, desc: "Teh melati dingin dengan buah leci.", groups: [ukuran, gula] },
-      { name: "Chocolate Signature", emoji: "🍫", price: 28000, desc: "Cokelat Belgia pekat, creamy dan tidak terlalu manis.", groups: [suhu, ukuran] },
-      { name: "Air Mineral", emoji: "💧", price: 8000, desc: "Air mineral botol 600 ml." },
+      { name: "Es Teh Tarik", featured: true, emoji: "🧋", price: 32 * K, desc: "Teh susu tarik dingin.", groups: [manis] },
+      { name: "Es Sonkit", featured: true, emoji: "🍋", price: 22 * K, desc: "Jeruk sonkit segar dengan es." },
+      { name: "Earl Grey Latte", emoji: "🫖", price: 37 * K, desc: "Earl grey dengan susu, disajikan dingin.", groups: [manis] },
+      { name: "Chai Latte", emoji: "🫖", price: 35 * K, desc: "Teh rempah dengan susu, disajikan dingin.", groups: [manis] },
+      { name: "Earl Grey Lychee Tea", emoji: "🍹", price: 35 * K, desc: "Earl grey dingin dengan leci." },
+      { name: "Teh Tawar", emoji: "🍵", price: 13 * K, desc: "Teh tanpa gula.", groups: [suhu(13, 15)] },
+      { name: "Teh Manis", emoji: "🍵", price: 15 * K, desc: "Teh dengan gula.", groups: [suhu(15, 17)] },
+    ],
+  },
+  {
+    name: "All Day Breakfast",
+    icon: "🍞",
+    items: [
+      { name: "Roti Cocol", emoji: "🍞", price: 30 * K, desc: "Roti kukus atau bakar dengan satu cocolan pilihanmu.", featured: true, image: img("roti-cocol"), groups: [roti, cocolan, ekstraCocolan] },
+      { name: "Soft Boiled Egg", emoji: "🥚", price: 10 * K, desc: "Telur setengah matang, teman roti cocol.", groups: [telur] },
+    ],
+  },
+  {
+    name: "Light Bites",
+    icon: "🍢",
+    items: [
+      { name: "Tahu Rempah", emoji: "🍢", price: 27 * K, desc: "Tahu goreng berbalut bumbu rempah.", featured: true, image: img("tahu-rempah") },
+      { name: "Singkong Goreng Cabe Ijo", emoji: "🌶️", price: 32 * K, desc: "Singkong goreng dengan sambal cabe ijo. Pedas, mengandung ketumbar.", image: img("singkong-cabe-ijo") },
+      { name: "Pisang Goreng Kaya", emoji: "🍌", price: 34 * K, desc: "Pisang goreng renyah dengan cocolan kaya.", image: img("pisang-goreng-kaya") },
+      { name: "Chicken Bites", emoji: "🍗", price: 43 * K, desc: "Ayam goreng potong dengan spicy peanut sauce. Pedas, mengandung kacang.", image: img("chicken-bites") },
+    ],
+  },
+  {
+    name: "Main",
+    icon: "🍚",
+    items: [
+      { name: "Classic Gua Bao", emoji: "🥙", price: 57 * K, desc: "Bao kukus isi pork, acar, dan daun ketumbar. Mengandung pork dan kacang.", featured: true, image: img("gua-bao") },
+      { name: "Thai Sauce Rice with Egg", emoji: "🍳", price: 50 * K, desc: "Nasi dengan saus thai dan telur mata sapi. Pilih chicken atau pork.", image: img("thai-sauce-rice"), groups: [protein] },
+      { name: "Nashville Chicken Bao", emoji: "🥙", price: 53 * K, desc: "Bao kukus isi ayam nashville. Pedas, mengandung kacang." },
+      { name: "Beef Pad Kra Pao with Egg", emoji: "🍛", price: 55 * K, desc: "Daging sapi cincang tumis basil dengan nasi dan telur.", groups: [pedas] },
+    ],
+  },
+  {
+    name: "Bakery",
+    icon: "🥐",
+    items: [
+      { name: "Salt Bread Original", emoji: "🥐", price: 17 * K, desc: "Roti mentega asin, renyah di luar dan lembut di dalam.", image: img("salt-bread") },
+      { name: "Salt Bread Garlic", emoji: "🧄", price: 20 * K, desc: "Salt bread dengan mentega bawang putih." },
+      { name: "Salted Choco Krisp", emoji: "🍫", price: 27 * K, desc: "Salt bread cokelat dengan topping renyah.", featured: true },
+      { name: "Egg & Cheese Mayo", featured: true, emoji: "🧀", price: 27 * K, desc: "Salt bread isi telur dan keju mayo.", image: img("egg-cheese-mayo") },
+      { name: "Pistachio Cream", emoji: "🥐", price: 30 * K, desc: "Salt bread isi krim pistachio." },
+      { name: "Tuna Mayo", emoji: "🐟", price: 30 * K, desc: "Salt bread isi tuna mayo." },
+      { name: "Blueberry Cream Cheese", emoji: "🫐", price: 30 * K, desc: "Salt bread isi blueberry dan cream cheese." },
+      { name: "Mini Salt Bread (10 pcs)", emoji: "🥐", price: 60 * K, desc: "Sepuluh salt bread mini untuk berbagi." },
     ],
   },
   {
     name: "Dessert",
-    icon: "🍨",
+    icon: "🍰",
     items: [
-      { name: "Es Campur Nusantara", emoji: "🍧", price: 25000, desc: "Cincau, kolang-kaling, alpukat, nangka dan sirup merah.", featured: true },
-      { name: "Klepon Cake", emoji: "🍰", price: 32000, desc: "Bolu pandan lembut dengan gula merah cair dan kelapa." },
-      { name: "Affogato", emoji: "🍨", price: 30000, desc: "Es krim vanila disiram espresso panas." },
+      { name: "Basque No. 5", emoji: "🍰", price: 68 * K, desc: "Basque cheesecake andalan Warm Hour.", featured: true, image: img("basque-no5") },
+      { name: "Original Basque Cheese Cake", emoji: "🍰", price: 55 * K, desc: "Basque cheesecake klasik dengan permukaan karamel." },
+      { name: "Choco Berry Basque Cheese Cake", emoji: "🍫", price: 58 * K, desc: "Basque cheesecake cokelat dengan berry." },
+      { name: "Tiramisu", emoji: "🍮", price: 65 * K, desc: "Mascarpone, kopi, dan kakao." },
+      { name: "Carrot Cake Slice", emoji: "🥕", price: 60 * K, desc: "Carrot cake dengan cream cheese frosting." },
+      { name: "Blackforest Cake Slice", featured: true, emoji: "🍒", price: 60 * K, desc: "Kue cokelat berlapis krim dan ceri.", image: img("blackforest") },
     ],
   },
 ];
@@ -109,42 +179,23 @@ async function main() {
   console.log("🏪 Outlet & meja…");
   const kemang = await db.outlet.create({
     data: {
-      name: "Santap Kemang",
-      slug: "kemang",
-      address: "Jl. Kemang Raya No. 12, Jakarta Selatan",
-      phone: "0812-0000-1111",
-      taxRate: 10,
-      serviceRate: 5,
-      receiptFooter: "Terima kasih sudah bersantap! Wi-Fi: santap / makanenak",
-    },
-  });
-  const bandung = await db.outlet.create({
-    data: {
-      name: "Santap Dago",
-      slug: "dago",
-      address: "Jl. Ir. H. Juanda No. 88, Bandung",
-      phone: "0812-0000-2222",
+      name: "Warm Hour Cafe",
+      slug: "warm-hour",
+      address: "No.11 Blok A1, Jl. KH. Moh. Mansyur, Duri Pulo, Gambir, Jakarta Pusat",
+      phone: "0852-8262-3535",
       taxRate: 10,
       serviceRate: 0,
-      receiptFooter: "Sampai jumpa lagi di Santap Dago!",
+      receiptFooter: "Thank you for visiting Warm Hour. See you any other hour! IG @cafe_by_warmhour",
     },
   });
 
   const tableDefs = [
-    ...Array.from({ length: 8 }, (_, i) => ({ name: `Meja ${String(i + 1).padStart(2, "0")}`, area: "Indoor", capacity: i < 4 ? 2 : 4 })),
-    ...Array.from({ length: 4 }, (_, i) => ({ name: `Teras ${i + 1}`, area: "Outdoor", capacity: 4 })),
+    ...Array.from({ length: 10 }, (_, i) => ({ name: `Meja ${String(i + 1).padStart(2, "0")}`, area: "Indoor", capacity: i < 6 ? 2 : 4 })),
+    ...Array.from({ length: 3 }, (_, i) => ({ name: `Teras ${i + 1}`, area: "Teras", capacity: 2 })),
   ];
   const kemangTables = [];
   for (const [i, t] of tableDefs.entries()) {
     kemangTables.push(await db.diningTable.create({ data: { ...t, outletId: kemang.id, qrToken: token(), sortOrder: i } }));
-  }
-  const dagoTables = [];
-  for (let i = 0; i < 6; i++) {
-    dagoTables.push(
-      await db.diningTable.create({
-        data: { name: `Meja ${String(i + 1).padStart(2, "0")}`, area: "Indoor", capacity: 4, outletId: bandung.id, qrToken: token(), sortOrder: i },
-      })
-    );
   }
 
   console.log("🍽️  Menu…");
@@ -158,6 +209,7 @@ async function main() {
           name: item.name,
           description: item.desc,
           emoji: item.emoji,
+          imageUrl: item.image,
           price: item.price,
           isFeatured: item.featured ?? false,
           sortOrder: pi,
@@ -183,8 +235,8 @@ async function main() {
     }
   }
   // Contoh stok habis
-  const affogato = allProducts.find((p) => p.name === "Affogato")!;
-  await db.productUnavailable.create({ data: { outletId: kemang.id, productId: affogato.id } });
+  const habis = allProducts.find((p) => p.name === "Pistachio Cream")!;
+  await db.productUnavailable.create({ data: { outletId: kemang.id, productId: habis.id } });
 
   console.log("👤 Akun staf…");
   const password = await hashPassword("password123");
@@ -193,7 +245,6 @@ async function main() {
     { name: "Sari Kasir", email: "kasir@santap.id", role: "KASIR" as const, outletId: kemang.id },
     { name: "Budi Dapur", email: "dapur@santap.id", role: "DAPUR" as const, outletId: kemang.id },
     { name: "Rina Pelayan", email: "pelayan@santap.id", role: "PELAYAN" as const, outletId: kemang.id },
-    { name: "Dimas Kasir", email: "kasir.dago@santap.id", role: "KASIR" as const, outletId: bandung.id },
   ];
   const created: Record<string, string> = {};
   for (const u of users) {
@@ -205,30 +256,34 @@ async function main() {
 
   console.log("📈 Riwayat transaksi 14 hari…");
   const methods: PaymentMethod[] = ["CASH", "CASH", "MIDTRANS", "MIDTRANS", "QRIS_STATIC", "CARD"];
-  for (const outlet of [kemang, bandung]) {
-    const cashierId = outlet.id === kemang.id ? created["kasir@santap.id"] : created["kasir.dago@santap.id"];
-    const tables = outlet.id === kemang.id ? kemangTables : dagoTables;
+  for (const outlet of [kemang]) {
+    const cashierId = created["kasir@santap.id"];
+    const tables = kemangTables;
     for (let daysAgo = 14; daysAgo >= 1; daysAgo--) {
       const day = new Date();
       day.setDate(day.getDate() - daysAgo);
       const open = new Date(day);
-      open.setHours(9, 0, 0, 0);
+      open.setHours(7, 30, 0, 0);
       const close = new Date(day);
-      close.setHours(21, 30, 0, 0);
+      close.setHours(21, 0, 0, 0);
       const shift = await db.shift.create({
         data: { outletId: outlet.id, userId: cashierId, openedAt: open, closedAt: close, openingCash: 500000 },
       });
       const weekend = [0, 6].includes(day.getDay());
-      const count = randInt(outlet.id === kemang.id ? 18 : 10, outlet.id === kemang.id ? 34 : 20) + (weekend ? 10 : 0);
+      const count = randInt(18, 34) + (weekend ? 10 : 0);
       let cashTotal = 0;
       for (let n = 1; n <= count; n++) {
         const createdAt = new Date(day);
-        const hour = pick([10, 11, 12, 12, 12, 13, 13, 14, 15, 16, 17, 18, 18, 19, 19, 19, 20]);
+        const hour = pick([8, 8, 9, 9, 10, 10, 11, 12, 12, 13, 14, 15, 15, 16, 16, 17, 18, 19, 20]);
         createdAt.setHours(hour, randInt(0, 59), randInt(0, 59), 0);
         const lineCount = randInt(1, 4);
         const items = Array.from({ length: lineCount }, () => {
           const p = pick(allProducts);
-          const modifiers = p.groups.flatMap((g) => (g.min > 0 ? [{ group: g.name, option: g.options[0].name, priceDelta: g.options[0].priceDelta }] : []));
+          const modifiers = p.groups.flatMap((g) => {
+            if (g.min === 0) return [];
+            const o = pick(g.options);
+            return [{ group: g.name, option: o.name, priceDelta: o.priceDelta }];
+          });
           const unit = p.price + modifiers.reduce((s, m) => s + m.priceDelta, 0);
           const qty = randInt(1, 3);
           return { productId: p.id, name: p.name, unitPrice: unit, quantity: qty, modifiers, lineTotal: unit * qty, isDone: true, paidQty: qty };

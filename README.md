@@ -64,7 +64,6 @@ Buka **http://localhost:3000**.
 | Kasir | `kasir@santap.id` |
 | Dapur | `dapur@santap.id` |
 | Pelayan | `pelayan@santap.id` |
-| Kasir outlet Dago | `kasir.dago@santap.id` |
 
 Di halaman login (mode development) ada tombol masuk cepat untuk tiap akun. Halaman beranda juga menampilkan link QR meja untuk mencoba sisi customer.
 

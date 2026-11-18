@@ -1,14 +1,15 @@
 import type { MetadataRoute } from "next";
+import { BRAND } from "@/lib/brand";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Santap POS",
-    short_name: "Santap",
-    description: "POS F&B dengan pemesanan QR meja dan dapur realtime",
+    name: BRAND.name,
+    short_name: BRAND.shortName,
+    description: BRAND.description,
     start_url: "/login",
     display: "standalone",
-    background_color: "#fbf8f4",
-    theme_color: "#f26b1d",
+    background_color: BRAND.backgroundColor,
+    theme_color: BRAND.themeColor,
     orientation: "any",
     icons: [
       { src: "/icon-192.png", sizes: "192x192", type: "image/png" },

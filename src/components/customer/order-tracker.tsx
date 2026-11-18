@@ -49,7 +49,7 @@ type TrackerOrder = {
 const STEPS: { key: OrderStatus; label: string; icon: typeof Check }[] = [
   { key: "PENDING", label: "Dibuat", icon: Receipt },
   { key: "CONFIRMED", label: "Diterima", icon: Check },
-  { key: "PREPARING", label: "Dimasak", icon: ChefHat },
+  { key: "PREPARING", label: "Disiapkan", icon: ChefHat },
   { key: "READY", label: "Siap", icon: HandPlatter },
   { key: "COMPLETED", label: "Selesai", icon: PartyPopper },
 ];
@@ -353,25 +353,25 @@ function Line({ label, v }: { label: string; v: number }) {
 }
 
 function heroFor(order: TrackerOrder, needsOnlinePay: boolean) {
-  const warm = "bg-gradient-to-br from-[oklch(0.6_0.19_38)] via-primary to-[oklch(0.75_0.16_65)]";
+  const warm = "bg-gradient-to-br from-olive-deep to-olive";
   switch (order.status) {
     case "PENDING":
       return needsOnlinePay
         ? { bg: warm, icon: CreditCard, title: "Menunggu pembayaran", desc: "Selesaikan pembayaran agar pesananmu langsung diproses dapur." }
-        : { bg: "bg-gradient-to-br from-amber-500 to-orange-500", icon: Banknote, title: "Menunggu konfirmasi", desc: "Staf akan segera mengonfirmasi pesananmu. Pembayaran dilakukan di kasir." };
+        : { bg: "bg-gradient-to-br from-[oklch(0.6_0.11_70)] to-honey", icon: Banknote, title: "Menunggu konfirmasi", desc: "Staf akan segera mengonfirmasi pesananmu. Pembayaran dilakukan di kasir." };
     case "CONFIRMED":
-      return { bg: "bg-gradient-to-br from-sky-500 to-indigo-500", icon: Clock, title: "Pesanan diterima", desc: "Pesananmu sudah masuk antrean dapur." };
+      return { bg: "bg-gradient-to-br from-olive-deep to-olive", icon: Clock, title: "Pesanan diterima", desc: "Pesananmu sudah masuk antrean dapur." };
     case "PREPARING":
-      return { bg: warm, icon: ChefHat, title: "Sedang dimasak", desc: "Chef kami sedang menyiapkan pesananmu dengan sepenuh hati 👨‍🍳" };
+      return { bg: warm, icon: ChefHat, title: "Sedang disiapkan", desc: "Barista dan dapur kami sedang menyiapkan pesananmu." };
     case "READY":
       return {
-        bg: "bg-gradient-to-br from-emerald-500 to-teal-500",
+        bg: "bg-gradient-to-br from-[oklch(0.5_0.1_150)] to-[oklch(0.6_0.11_145)]",
         icon: HandPlatter,
         title: "Pesanan siap!",
         desc: order.type === "DINE_IN" ? "Pesanan sedang diantar ke mejamu." : "Silakan ambil pesananmu di counter.",
       };
     case "COMPLETED":
-      return { bg: "bg-gradient-to-br from-emerald-600 to-emerald-500", icon: PartyPopper, title: "Selamat menikmati!", desc: "Terima kasih sudah memesan. Sampai jumpa lagi 🧡" };
+      return { bg: "bg-gradient-to-br from-[oklch(0.5_0.1_150)] to-[oklch(0.6_0.11_145)]", icon: PartyPopper, title: "Selamat menikmati!", desc: "Terima kasih sudah mampir. Sampai jumpa di warm hour berikutnya." };
     case "CANCELLED":
       return { bg: "bg-gradient-to-br from-zinc-600 to-zinc-500", icon: XCircle, title: "Pesanan dibatalkan", desc: order.cancelReason || "Hubungi staf jika ada pertanyaan." };
   }
