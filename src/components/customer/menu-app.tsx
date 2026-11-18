@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { Bell, ChevronRight, Plus, Receipt, Search, ShoppingBag, Star, UserRound, X } from "lucide-react";
 import { toast } from "sonner";
@@ -15,7 +15,10 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerDescription } from "@/compone
 import { ProductOptions } from "@/components/menu/product-options";
 import { Button } from "@/components/ui/button";
 import { CartSheet } from "./cart-sheet";
-import { callStaff } from "@/server/actions/customer";
+import { callStaff, getDeviceOrders } from "@/server/actions/customer";
+import { isActiveOrder, type OrderSummary } from "@/lib/order-summary";
+import { useRealtime } from "@/hooks/use-realtime";
+import { OrderSummaryCard } from "./order-summary-card";
 
 export type MenuOutlet = {
   id: string;
@@ -111,6 +114,27 @@ export function MenuApp({
   const reorderDone = useRef(false);
 
   useEffect(() => setOrders(recentOrders(outlet.id)), [outlet.id]);
+
+  // Ringkasan pesanan (status, item, total, bayar) + pembaruan realtime
+  const [summaries, setSummaries] = useState<OrderSummary[] | null>(null);
+  const orderIds = orders.map((o) => o.id).join(",");
+  const loadSummaries = useCallback(() => {
+    if (!orderIds) return;
+    getDeviceOrders(orderIds.split(",")).then((r) => r.ok && setSummaries(r.data));
+  }, [orderIds]);
+  useEffect(loadSummaries, [loadSummaries]);
+  useEffect(() => {
+    if (ordersOpen) loadSummaries();
+  }, [ordersOpen, loadSummaries]);
+  const activeIds = (summaries ?? []).filter((o) => isActiveOrder(o.status)).map((o) => o.id).join(",");
+  useRealtime(activeIds ? `/api/stream/orders?ids=${activeIds}` : null, () => loadSummaries(), { refresh: false });
+  useEffect(() => {
+    const onVisible = () => document.visibilityState === "visible" && loadSummaries();
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, [loadSummaries]);
+  const activeCount = summaries?.filter((o) => isActiveOrder(o.status)).length ?? 0;
+  const anyReady = summaries?.some((o) => o.status === "READY") ?? false;
 
   // "Pesan lagi" dari riwayat akun: isi keranjang lalu buka
   useEffect(() => {
@@ -214,9 +238,15 @@ export function MenuApp({
             {orders.length > 0 && (
               <button
                 onClick={() => (orders.length === 1 ? router.push(`/order/${orders[0].id}`) : setOrdersOpen(true))}
-                className="flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-3.5 text-xs font-semibold transition hover:bg-cream/25"
+                className="relative flex h-10 shrink-0 items-center gap-1.5 rounded-full bg-cream/15 px-3.5 text-xs font-semibold transition hover:bg-cream/25"
               >
                 <Receipt className="size-4" /> Pesanan{orders.length > 1 ? ` (${orders.length})` : ""}
+                {activeCount > 0 && (
+                  <span
+                    className={cn("absolute -right-0.5 -top-0.5 size-3 rounded-full ring-2 ring-olive", anyReady ? "animate-pulse bg-[oklch(0.75_0.15_150)]" : "bg-honey")}
+                    aria-label={anyReady ? "Ada pesanan siap" : "Ada pesanan berjalan"}
+                  />
+                )}
               </button>
             )}
             {(customer || googleEnabled) && (
@@ -487,26 +517,20 @@ export function MenuApp({
       <Drawer open={ordersOpen} onOpenChange={setOrdersOpen}>
         <DrawerContent>
           <div className="space-y-3 px-5 pb-safe pt-3">
-            <DrawerTitle className="text-xl font-bold">Pesanan saya</DrawerTitle>
-            <DrawerDescription className="text-sm text-muted-foreground">Pesanan dari perangkat ini hari ini</DrawerDescription>
-            <ul className="space-y-2 pb-4">
-              {orders.map((o) => (
-                <li key={o.id}>
-                  <Link href={`/order/${o.id}`} className="flex items-center gap-3 rounded-2xl border p-3 transition hover:border-primary hover:bg-primary/5">
-                    <span className="grid size-11 place-items-center rounded-xl bg-primary/10 font-bold text-primary tabular">
-                      {o.no ? `#${String(o.no).padStart(3, "0")}` : <Receipt className="size-5" />}
-                    </span>
-                    <span className="flex-1 text-sm">
-                      <span className="block font-semibold">Pesanan {o.no ? `#${String(o.no).padStart(3, "0")}` : ""}</span>
-                      <span className="text-xs text-muted-foreground">
-                        Dibuat {new Date(o.at).toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </span>
-                    <ChevronRight className="size-4 text-muted-foreground" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
+            <div>
+              <DrawerTitle className="text-xl font-bold">Pesanan saya</DrawerTitle>
+              <DrawerDescription className="text-sm text-muted-foreground">
+                {activeCount ? `${activeCount} sedang berjalan · status diperbarui otomatis` : "Pesanan dari perangkat ini hari ini"}
+              </DrawerDescription>
+            </div>
+            <div className="-mx-5 max-h-[70dvh] space-y-2.5 overflow-y-auto px-5 pb-4">
+              {summaries === null
+                ? orders.map((o) => <div key={o.id} className="h-36 animate-pulse rounded-2xl bg-muted" />)
+                : summaries.map((o) => <OrderSummaryCard key={o.id} order={o} onNavigate={() => setOrdersOpen(false)} />)}
+              {summaries?.length === 0 && (
+                <p className="rounded-2xl border border-dashed p-6 text-center text-sm text-muted-foreground">Belum ada pesanan hari ini.</p>
+              )}
+            </div>
           </div>
         </DrawerContent>
       </Drawer>

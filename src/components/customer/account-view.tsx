@@ -1,32 +1,17 @@
 "use client";
 import { useEffect, useState, useTransition } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Pencil, RotateCcw } from "lucide-react";
+import { Pencil } from "lucide-react";
 import { toast } from "sonner";
-import type { OrderStatus, PaymentStatus } from "@prisma/client";
-import { cn, formatRupiah, initials, pad } from "@/lib/utils";
+import { cn, formatRupiah, initials } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
-import { OrderStatusBadge } from "@/components/shared/status-badge";
+import { isActiveOrder, type OrderSummary } from "@/lib/order-summary";
+import { useRealtime } from "@/hooks/use-realtime";
+import { OrderSummaryCard } from "./order-summary-card";
 import { claimDeviceOrders, updateCustomerProfile } from "@/server/actions/account";
 import { SignOutButton } from "./sign-out-button";
 
-type AccountOrder = {
-  id: string;
-  queueNumber: number;
-  createdLabel: string;
-  pickupLabel: string | null;
-  status: OrderStatus;
-  paymentStatus: PaymentStatus;
-  total: number;
-  outletName: string;
-  tableName: string | null;
-  items: string[];
-  reorderHref: string | null;
-};
-
-const ACTIVE: OrderStatus[] = ["PENDING", "CONFIRMED", "PREPARING", "READY"];
 
 function deviceOrderIds() {
   const ids: string[] = [];
@@ -51,7 +36,7 @@ export function AccountView({
 }: {
   customer: { id: string; name: string; email: string; image: string | null; phone: string | null };
   stats: { orders: number; spent: number; visits: number; favourites: { name: string; qty: number }[] };
-  orders: AccountOrder[];
+  orders: OrderSummary[];
   children?: React.ReactNode;
 }) {
   const router = useRouter();
@@ -83,7 +68,11 @@ export function AccountView({
     }
   }, [customer.name, customer.phone]);
 
-  const activeOrders = orders.filter((o) => ACTIVE.includes(o.status));
+  // Status pesanan yang masih berjalan diperbarui otomatis
+  const activeIds = orders.filter((o) => isActiveOrder(o.status)).slice(0, 10).map((o) => o.id).join(",");
+  useRealtime(activeIds ? `/api/stream/orders?ids=${activeIds}` : null);
+
+  const activeOrders = orders.filter((o) => isActiveOrder(o.status));
   const list = tab === "active" ? activeOrders : orders;
 
   return (
@@ -171,29 +160,8 @@ export function AccountView({
         ) : (
           <ul className="space-y-2.5">
             {list.map((o) => (
-              <li key={o.id} className="rounded-2xl border bg-card p-3.5">
-                <Link href={`/order/${o.id}`} className="flex items-start gap-3">
-                  <span className="grid size-11 shrink-0 place-items-center rounded-xl bg-primary/10 text-sm font-bold text-primary tabular">#{pad(o.queueNumber)}</span>
-                  <span className="min-w-0 flex-1">
-                    <span className="flex items-center justify-between gap-2">
-                      <span className="truncate font-semibold">{o.outletName}</span>
-                      <OrderStatusBadge status={o.status} />
-                    </span>
-                    <span className="block text-xs text-muted-foreground">
-                      {o.createdLabel} · {o.tableName ? o.tableName : o.pickupLabel ? `Takeaway, ambil ${o.pickupLabel}` : "Takeaway"}
-                    </span>
-                    <span className="mt-1 line-clamp-2 block text-sm text-foreground/80">{o.items.join(", ")}</span>
-                  </span>
-                  <ChevronRight className="mt-3 size-4 shrink-0 text-muted-foreground" />
-                </Link>
-                <div className="mt-3 flex items-center justify-between border-t pt-3">
-                  <span className="text-sm font-bold tabular">{formatRupiah(o.total)}</span>
-                  {o.reorderHref && (
-                    <Link href={o.reorderHref} className="inline-flex items-center gap-1.5 rounded-full bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground">
-                      <RotateCcw className="size-3.5" /> Pesan lagi
-                    </Link>
-                  )}
-                </div>
+              <li key={o.id}>
+                <OrderSummaryCard order={o} showOutlet />
               </li>
             ))}
           </ul>
