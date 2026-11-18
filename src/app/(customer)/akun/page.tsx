@@ -8,9 +8,9 @@ import { BRAND } from "@/lib/brand";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { GoogleSignIn } from "@/components/customer/google-sign-in";
 import { AccountView } from "@/components/customer/account-view";
-import { pickupLabel } from "@/lib/pickup-label";
+import { orderSummaryInclude, toOrderSummary } from "@/server/order-summary";
+import { sortOrderSummaries } from "@/lib/order-summary";
 
-const TZ = process.env.APP_TIMEZONE || "Asia/Jakarta";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Akun saya" };
@@ -108,11 +108,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
       where,
       orderBy: { createdAt: "desc" },
       take: 50,
-      include: {
-        outlet: { select: { name: true, slug: true, takeawayEnabled: true, isActive: true } },
-        table: { select: { name: true } },
-        items: { select: { name: true, quantity: true }, orderBy: { id: "asc" } },
-      },
+      include: orderSummaryInclude,
     }),
     db.order.aggregate({ where: { ...where, status: { not: "CANCELLED" } }, _count: true, _sum: { total: true } }),
     db.order.groupBy({ by: ["outletId", "businessDate"], where: { ...where, status: { not: "CANCELLED" } } }),
@@ -129,19 +125,7 @@ export default async function AccountPage({ searchParams }: { searchParams: Prom
     <AccountView
       customer={customer}
       stats={{ orders: totals._count, spent: totals._sum.total ?? 0, visits: visits.length, favourites: favourites.map((f) => ({ name: f.name, qty: f._sum.quantity ?? 0 })) }}
-      orders={orders.map((o) => ({
-        id: o.id,
-        queueNumber: o.queueNumber,
-        createdLabel: o.createdAt.toLocaleString("id-ID", { timeZone: TZ, dateStyle: "medium", timeStyle: "short" }),
-        pickupLabel: pickupLabel(o.pickupAt),
-        status: o.status,
-        paymentStatus: o.paymentStatus,
-        total: o.total,
-        outletName: o.outlet.name,
-        tableName: o.table?.name ?? null,
-        items: o.items.map((i) => `${i.quantity}× ${i.name}`),
-        reorderHref: o.outlet.isActive && o.outlet.takeawayEnabled ? `/m/${o.outlet.slug}?reorder=${o.id}` : null,
-      }))}
+      orders={sortOrderSummaries(orders.map((o) => toOrderSummary(o, { withDate: true })))}
     >
       {outlets.length > 0 && <TakeawayList outlets={outlets} />}
     </AccountView>

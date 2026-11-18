@@ -8,6 +8,8 @@ import { isDemoPaymentAllowed, isMidtransEnabled, isOnlinePaymentAvailable } fro
 import { rateLimit } from "@/lib/rate-limit";
 import { getCurrentCustomer } from "@/lib/session";
 import { canOrderAsap, isValidPickup } from "@/lib/pickup";
+import { orderSummaryInclude, toOrderSummary } from "@/server/order-summary";
+import { sortOrderSummaries, type OrderSummary } from "@/lib/order-summary";
 
 const TZ = process.env.APP_TIMEZONE || "Asia/Jakarta";
 
@@ -171,6 +173,21 @@ export async function callStaff(
       kind: type,
     });
     return { ok: true, data: undefined };
+  } catch (e) {
+    return fail(e);
+  }
+}
+
+/** Ringkasan pesanan yang diingat perangkat ini (sheet "Pesanan saya" di menu) */
+export async function getDeviceOrders(orderIds: string[]): Promise<ActionResult<OrderSummary[]>> {
+  try {
+    const ids = z.array(z.string().min(10).max(40)).max(10).parse(orderIds);
+    if (!ids.length) return { ok: true, data: [] };
+    const rows = await db.order.findMany({
+      where: { id: { in: ids }, createdAt: { gte: new Date(Date.now() - 24 * 3600_000) } },
+      include: orderSummaryInclude,
+    });
+    return { ok: true, data: sortOrderSummaries(rows.map((o) => toOrderSummary(o))) };
   } catch (e) {
     return fail(e);
   }
