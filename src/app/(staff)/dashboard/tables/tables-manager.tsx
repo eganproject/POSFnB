@@ -1,13 +1,14 @@
 "use client";
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Copy, Download, ExternalLink, MoreVertical, Pencil, Plus, Printer, RefreshCw, Rows3, ShoppingBag, Trash2, TriangleAlert, Users } from "lucide-react";
+import { Copy, ExternalLink, ImageDown, QrCode, MoreVertical, Pencil, Plus, Printer, RefreshCw, Rows3, ShoppingBag, Trash2, TriangleAlert, Users } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Field, Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, Switch, EmptyState } from "@/components/ui/misc";
+import { TableQrCard } from "@/components/shared/table-qr-card";
 import { bulkCreateTables, deleteTable, regenerateTableQr, saveTable } from "@/server/actions/admin";
 
 type T = { id: string; name: string; area: string | null; capacity: number; isActive: boolean; token: string; url: string; qr: string; activeOrders: number };
@@ -30,12 +31,34 @@ export function TablesManager({ canEdit, outletId, tables, takeaway, localhostWa
     });
 
   const copy = (url: string) => navigator.clipboard.writeText(url).then(() => toast.success("Link disalin"));
+  const fileName = (name: string) => name.replace(/\s+/g, "-");
   const download = (t: { name: string; qr: string }) => {
     const a = document.createElement("a");
     a.href = t.qr;
-    a.download = `QR-${t.name.replace(/\s+/g, "-")}.png`;
+    a.download = `QR-${fileName(t.name)}.png`;
     a.click();
   };
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [saving, setSaving] = useState(false);
+  /** Unduh kartu bermerek sebagai PNG resolusi cetak (± 300 dpi) */
+  const downloadCard = async (name: string) => {
+    if (!cardRef.current) return;
+    setSaving(true);
+    try {
+      const { toPng } = await import("html-to-image");
+      await document.fonts.ready;
+      const url = await toPng(cardRef.current, { pixelRatio: 3, cacheBust: true });
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `Kartu-QR-${fileName(name)}.png`;
+      a.click();
+    } catch {
+      toast.error("Gagal membuat gambar kartu. Coba lewat Cetak → Simpan PDF.");
+    } finally {
+      setSaving(false);
+    }
+  };
+  const printHref = (t: T) => (t.id === "takeaway" ? "/print/tables?takeaway=1" : `/print/tables?ids=${t.id}`);
 
   return (
     <div className="space-y-5">
@@ -62,7 +85,7 @@ export function TablesManager({ canEdit, outletId, tables, takeaway, localhostWa
         )}
         <Button variant="outline" asChild>
           <a href="/print/tables" target="_blank" rel="noreferrer">
-            <Printer /> Cetak semua QR
+            <Printer /> Cetak semua kartu QR
           </a>
         </Button>
         <Button variant="ghost" onClick={() => setPreview({ id: "takeaway", name: "Takeaway", area: null, capacity: 0, isActive: true, token: "", url: takeaway.url, qr: takeaway.qr, activeOrders: 0 })}>
@@ -99,7 +122,9 @@ export function TablesManager({ canEdit, outletId, tables, takeaway, localhostWa
                     <DropdownMenuContent align="end">
                       <DropdownMenuItem onSelect={() => copy(t.url)}><Copy /> Salin link</DropdownMenuItem>
                       <DropdownMenuItem onSelect={() => window.open(t.url, "_blank")}><ExternalLink /> Buka menu</DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => download(t)}><Download /> Unduh QR</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => setPreview(t)}><ImageDown /> Lihat & unduh kartu</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => window.open(printHref(t), "_blank")}><Printer /> Cetak kartu ini</DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => download(t)}><QrCode /> Unduh QR saja</DropdownMenuItem>
                       {canEdit && (
                         <>
                           <DropdownMenuSeparator />
@@ -116,9 +141,14 @@ export function TablesManager({ canEdit, outletId, tables, takeaway, localhostWa
                   </DropdownMenu>
                 </div>
               </div>
-              <button onClick={() => setPreview(t)} className="mx-auto mt-3 block rounded-xl border bg-white p-2 transition group-hover:scale-[1.02]">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={t.qr} alt={`QR ${t.name}`} className="size-36" />
+              <button
+                onClick={() => setPreview(t)}
+                title="Lihat kartu QR"
+                className="mx-auto mt-3 block overflow-hidden rounded-lg shadow-md ring-1 ring-black/5 transition group-hover:-translate-y-0.5 group-hover:shadow-lg"
+              >
+                <div style={{ zoom: 0.42 }}>
+                  <TableQrCard name={t.name} area={t.area} qr={t.qr} />
+                </div>
               </button>
             </div>
           ))}
@@ -211,21 +241,33 @@ export function TablesManager({ canEdit, outletId, tables, takeaway, localhostWa
         </DialogContent>
       </Dialog>
 
-      {/* Preview QR */}
+      {/* Preview kartu QR */}
       <Dialog open={!!preview} onOpenChange={(o) => !o && setPreview(null)}>
-        <DialogContent className="max-w-sm text-center">
+        <DialogContent className="max-w-md">
           {preview && (
             <>
-              <DialogHeader className="items-center pr-0">
-                <DialogTitle>{preview.id === "takeaway" ? "QR Takeaway" : preview.name}</DialogTitle>
+              <DialogHeader>
+                <DialogTitle>{preview.id === "takeaway" ? "Kartu QR takeaway" : `Kartu QR ${preview.name}`}</DialogTitle>
                 <DialogDescription className="break-all text-xs">{preview.url}</DialogDescription>
               </DialogHeader>
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={preview.qr} alt="QR" className="mx-auto size-64 rounded-xl border bg-white p-2" />
-              <div className="grid grid-cols-3 gap-2">
-                <Button variant="outline" onClick={() => copy(preview.url)}><Copy /> Salin</Button>
-                <Button variant="outline" onClick={() => window.open(preview.url, "_blank")}><ExternalLink /> Buka</Button>
-                <Button onClick={() => download(preview)}><Download /> Unduh</Button>
+              <div className="grid place-items-center rounded-2xl bg-muted/60 p-4">
+                <div className="overflow-hidden rounded-lg shadow-lg" style={{ zoom: 0.78 }}>
+                  <div ref={cardRef}>
+                    <TableQrCard name={preview.id === "takeaway" ? null : preview.name} area={preview.area} qr={preview.qr} />
+                  </div>
+                </div>
+              </div>
+              <p className="text-center text-xs text-muted-foreground">Ukuran A6 (10,5 × 14,8 cm), pas untuk stand akrilik meja.</p>
+              <div className="grid grid-cols-2 gap-2">
+                <Button variant="outline" asChild>
+                  <a href={printHref(preview)} target="_blank" rel="noreferrer"><Printer /> Cetak / PDF</a>
+                </Button>
+                <Button onClick={() => downloadCard(preview.name)} loading={saving}><ImageDown /> Unduh kartu</Button>
+                <Button variant="ghost" size="sm" onClick={() => download(preview)}><QrCode /> Unduh QR saja</Button>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => copy(preview.url)}><Copy /> Salin</Button>
+                  <Button variant="ghost" size="sm" onClick={() => window.open(preview.url, "_blank")}><ExternalLink /> Buka</Button>
+                </div>
               </div>
             </>
           )}
