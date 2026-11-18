@@ -21,25 +21,27 @@ enum Role {
 }
 
 model User {
-  id            String    @id
-  name          String
-  email         String    @unique
-  emailVerified Boolean   @default(false)
-  image         String?
+  id             String     @id
+  name           String
+  email          String     @unique
+  emailVerified  Boolean    @default(false)
+  image          String?
   /// Nomor WhatsApp pelanggan (opsional, untuk isi otomatis saat pesan)
-  phone         String?
-  role          Role      @default(CUSTOMER)
-  isActive      Boolean   @default(true)
-  outletId      String?
-  outlet        Outlet?   @relation(fields: [outletId], references: [id], onDelete: SetNull)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  sessions      Session[]
-  accounts      Account[]
-  shifts        Shift[]
-  orders        Order[]   @relation("OrderCashier")
-  customerOrders Order[]  @relation("OrderCustomer")
-  payments      Payment[]
+  phone          String?
+  role           Role       @default(CUSTOMER)
+  isActive       Boolean    @default(true)
+  outletId       String?
+  outlet         Outlet?    @relation(fields: [outletId], references: [id], onDelete: SetNull)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  sessions       Session[]
+  accounts       Account[]
+  shifts         Shift[]
+  orders         Order[]    @relation("OrderCashier")
+  customerOrders Order[]    @relation("OrderCustomer")
+  payments       Payment[]
+  refunds        Refund[]   @relation("RefundUser")
+  auditLogs      AuditLog[] @relation("AuditUser")
 
   @@map("user")
 }
@@ -93,26 +95,28 @@ model Verification {
 // ─────────────────────────────────────────────
 
 model Outlet {
-  id            String   @id @default(cuid())
-  name          String
-  slug          String   @unique
-  address       String?
-  phone         String?
+  id                  String   @id @default(cuid())
+  name                String
+  slug                String   @unique
+  address             String?
+  phone               String?
   /// Persen pajak (PB1), mis. 10 = 10%
-  taxRate       Float    @default(10)
+  taxRate             Float    @default(10)
   /// Persen service charge
-  serviceRate   Float    @default(0)
-  receiptFooter String?
-  isActive      Boolean  @default(true)
+  serviceRate         Float    @default(0)
+  receiptFooter       String?
+  isActive            Boolean  @default(true)
+  /// Batas diskon (% dari subtotal) yang boleh diberikan kasir. Owner tidak dibatasi.
+  maxDiscountPercent  Int      @default(20)
   /// Terima pesanan takeaway dari aplikasi (pesan dari rumah, ambil di outlet)
-  takeawayEnabled     Boolean @default(true)
+  takeawayEnabled     Boolean  @default(true)
   /// Jam buka & tutup (HH:mm, zona waktu APP_TIMEZONE) untuk slot jam ambil
-  openTime            String  @default("08:00")
-  closeTime           String  @default("22:00")
+  openTime            String   @default("08:00")
+  closeTime           String   @default("22:00")
   /// Minimal waktu siap (menit) sejak pesanan dibuat
-  takeawayLeadMinutes Int     @default(15)
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  takeawayLeadMinutes Int      @default(15)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
 
   tables      DiningTable[]
   users       User[]
@@ -120,6 +124,7 @@ model Outlet {
   shifts      Shift[]
   unavailable ProductUnavailable[]
   requests    ServiceRequest[]
+  auditLogs   AuditLog[]
 }
 
 model DiningTable {
@@ -274,47 +279,49 @@ enum PaymentState {
 }
 
 model Order {
-  id            String         @id @default(cuid())
-  code          String         @unique
+  id             String         @id @default(cuid())
+  code           String         @unique
   /// Nomor antrean harian per outlet
-  queueNumber   Int
-  businessDate  String
-  outletId      String
-  outlet        Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
-  tableId       String?
-  table         DiningTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
-  type          OrderType      @default(DINE_IN)
-  source        OrderSource
-  status        OrderStatus    @default(PENDING)
-  paymentStatus PaymentStatus  @default(UNPAID)
+  queueNumber    Int
+  businessDate   String
+  outletId       String
+  outlet         Outlet         @relation(fields: [outletId], references: [id], onDelete: Restrict)
+  tableId        String?
+  table          DiningTable?   @relation(fields: [tableId], references: [id], onDelete: SetNull)
+  type           OrderType      @default(DINE_IN)
+  source         OrderSource
+  status         OrderStatus    @default(PENDING)
+  paymentStatus  PaymentStatus  @default(UNPAID)
   /// Pilihan bayar customer QR: MIDTRANS = bayar online, null = bayar di kasir
-  payPreference PaymentMethod?
-  customerName  String?
-  customerPhone String?
-  note          String?
-  subtotal      Int
-  discount      Int            @default(0)
-  serviceCharge Int            @default(0)
-  tax           Int            @default(0)
-  total         Int
-  cashierId     String?
-  cashier       User?          @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
+  payPreference  PaymentMethod?
+  customerName   String?
+  customerPhone  String?
+  note           String?
+  subtotal       Int
+  discount       Int            @default(0)
+  discountReason String?
+  serviceCharge  Int            @default(0)
+  tax            Int            @default(0)
+  total          Int
+  cashierId      String?
+  cashier        User?          @relation("OrderCashier", fields: [cashierId], references: [id], onDelete: SetNull)
   /// Pelanggan yang login saat memesan (untuk riwayat pesanan)
-  customerId    String?
-  customer      User?          @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
+  customerId     String?
+  customer       User?          @relation("OrderCustomer", fields: [customerId], references: [id], onDelete: SetNull)
   /// Jam ambil pesanan takeaway (null = secepatnya)
-  pickupAt      DateTime?
-  cancelReason  String?
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  confirmedAt   DateTime?
-  preparingAt   DateTime?
-  readyAt       DateTime?
-  completedAt   DateTime?
-  paidAt        DateTime?
+  pickupAt       DateTime?
+  cancelReason   String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+  confirmedAt    DateTime?
+  preparingAt    DateTime?
+  readyAt        DateTime?
+  completedAt    DateTime?
+  paidAt         DateTime?
 
   items    OrderItem[]
   payments Payment[]
+  refunds  Refund[]
 
   @@unique([outletId, businessDate, queueNumber])
   @@index([outletId, status])
@@ -371,7 +378,47 @@ model Payment {
   createdAt       DateTime      @default(now())
   updatedAt       DateTime      @updatedAt
   paidAt          DateTime?
+  refunds         Refund[]
 
+  @@index([orderId])
+}
+
+/// Pengembalian dana ke customer (dicatat manual oleh owner)
+model Refund {
+  id        String        @id @default(cuid())
+  orderId   String
+  order     Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  paymentId String?
+  payment   Payment?      @relation(fields: [paymentId], references: [id], onDelete: SetNull)
+  /// Cara uang dikembalikan (CASH = dari laci kas)
+  method    PaymentMethod
+  amount    Int
+  reason    String
+  /// Refund tunai mengurangi kas shift ini
+  shiftId   String?
+  shift     Shift?        @relation(fields: [shiftId], references: [id], onDelete: SetNull)
+  userId    String?
+  user      User?         @relation("RefundUser", fields: [userId], references: [id], onDelete: SetNull)
+  createdAt DateTime      @default(now())
+
+  @@index([orderId])
+  @@index([shiftId])
+}
+
+/// Jejak aksi sensitif: diskon, pembatalan, ubah item, refund, pembayaran janggal
+model AuditLog {
+  id        String   @id @default(cuid())
+  outletId  String
+  outlet    Outlet   @relation(fields: [outletId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation("AuditUser", fields: [userId], references: [id], onDelete: SetNull)
+  action    String
+  orderId   String?
+  message   String
+  detail    Json?
+  createdAt DateTime @default(now())
+
+  @@index([outletId, createdAt])
   @@index([orderId])
 }
 
@@ -390,6 +437,7 @@ model Shift {
   expectedCash Int?
   note         String?
   payments     Payment[]
+  refunds      Refund[]
 
   @@index([outletId, userId, closedAt])
 }

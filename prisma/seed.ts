@@ -159,7 +159,17 @@ const dateKey = (d: Date) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jakarta", year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
 
 async function main() {
+  // Seed menghapus SEMUA data dan membuat akun demo berpassword "password123".
+  // Jangan pernah dijalankan di server produksi. Untuk akun owner pertama di server,
+  // pakai: pnpm create-owner
+  if (process.env.NODE_ENV === "production" && process.env.SEED_FORCE !== "true") {
+    console.error("❌ Seed demo ditolak karena NODE_ENV=production (akan menghapus semua data).");
+    console.error("   Buat akun owner dengan: pnpm create-owner");
+    process.exit(1);
+  }
   console.log("🧹 Membersihkan data lama…");
+  await db.auditLog.deleteMany();
+  await db.refund.deleteMany();
   await db.serviceRequest.deleteMany();
   await db.payment.deleteMany();
   await db.orderItem.deleteMany();
@@ -276,6 +286,7 @@ async function main() {
         const createdAt = new Date(day);
         const hour = pick([8, 8, 9, 9, 10, 10, 11, 12, 12, 13, 14, 15, 15, 16, 16, 17, 18, 19, 20]);
         createdAt.setHours(hour, randInt(0, 59), randInt(0, 59), 0);
+        const done = new Date(createdAt.getTime() + randInt(12, 35) * 60000);
         const lineCount = randInt(1, 4);
         const items = Array.from({ length: lineCount }, () => {
           const p = pick(allProducts);
@@ -286,7 +297,11 @@ async function main() {
           });
           const unit = p.price + modifiers.reduce((s, m) => s + m.priceDelta, 0);
           const qty = randInt(1, 3);
-          return { productId: p.id, name: p.name, unitPrice: unit, quantity: qty, modifiers, lineTotal: unit * qty, isDone: true, paidQty: qty };
+          return {
+            productId: p.id, name: p.name, unitPrice: unit, quantity: qty, modifiers, lineTotal: unit * qty, paidQty: qty,
+            // Riwayat: semua item sudah diantar
+            status: "SERVED" as const, startedAt: createdAt, readyAt: done, servedAt: done,
+          };
         });
         const subtotal = items.reduce((s, i) => s + i.lineTotal, 0);
         const service = Math.round((subtotal * outlet.serviceRate) / 100);
@@ -295,7 +310,6 @@ async function main() {
         const source = Math.random() < 0.55 ? "QR" : "POS";
         const dineIn = Math.random() < 0.75;
         const method = source === "QR" ? pick<PaymentMethod>(["MIDTRANS", "MIDTRANS", "CASH"]) : pick(methods);
-        const done = new Date(createdAt.getTime() + randInt(12, 35) * 60000);
         if (method === "CASH") cashTotal += total;
         await db.order.create({
           data: {

@@ -3,8 +3,8 @@ import { z } from "zod";
 import { db } from "@/lib/db";
 import { channels, publish } from "@/lib/events";
 import { cartLineSchema, OrderError } from "@/server/pricing";
-import { applyGatewayState, createGatewayPayment, createOrder } from "@/server/orders";
-import { isMidtransEnabled } from "@/server/midtrans";
+import { applyGatewayState, createGatewayPayment, createOrder, voidPendingGatewayPayments } from "@/server/orders";
+import { isDemoPaymentAllowed, isMidtransEnabled, isOnlinePaymentAvailable } from "@/server/midtrans";
 import { rateLimit } from "@/lib/rate-limit";
 import { getCurrentCustomer } from "@/lib/session";
 import { canOrderAsap, isValidPickup } from "@/lib/pickup";
@@ -42,6 +42,9 @@ export async function placeOrder(
   try {
     if (!(await rateLimit("order", 8))) throw new OrderError(TOO_MANY);
     const data = placeOrderSchema.parse(input);
+    if (data.payMethod === "ONLINE" && !(await isOnlinePaymentAvailable())) {
+      throw new OrderError("Pembayaran online belum aktif. Pilih bayar di kasir.");
+    }
     let tableId: string | null = null;
     if (data.tableToken) {
       const table = await db.diningTable.findUnique({ where: { qrToken: data.tableToken } });
@@ -125,7 +128,7 @@ export async function switchToCashier(orderId: string): Promise<ActionResult> {
     if (!order || order.status !== "PENDING") throw new OrderError("Pesanan tidak bisa diubah.");
     if (order.pickupAt) throw new OrderError("Pesanan takeaway terjadwal harus dibayar online.");
     await db.order.update({ where: { id: orderId }, data: { payPreference: null } });
-    await db.payment.updateMany({ where: { orderId, state: "PENDING", method: "MIDTRANS" }, data: { state: "FAILED" } });
+    await voidPendingGatewayPayments(orderId);
     publish(channels.outlet(order.outletId), { type: "order.updated", orderId });
     publish(channels.order(orderId), { type: "order.updated", orderId });
     return { ok: true, data: undefined };
@@ -137,7 +140,7 @@ export async function switchToCashier(orderId: string): Promise<ActionResult> {
 /** Hanya untuk MODE DEMO (tanpa key Midtrans) */
 export async function simulatePayment(paymentId: string, success: boolean): Promise<ActionResult> {
   try {
-    if (await isMidtransEnabled()) throw new OrderError("Simulasi hanya tersedia di mode demo.");
+    if (!(await isDemoPaymentAllowed())) throw new OrderError("Simulasi pembayaran tidak tersedia.");
     const payment = await db.payment.findUnique({ where: { id: paymentId } });
     if (!payment || payment.method !== "MIDTRANS") throw new OrderError("Pembayaran tidak ditemukan.");
     await applyGatewayState(paymentId, success ? "SUCCESS" : "FAILED", { simulated: true }, "demo_qris");

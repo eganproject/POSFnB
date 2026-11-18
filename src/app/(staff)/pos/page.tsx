@@ -38,7 +38,7 @@ export default async function PosPage({ searchParams }: { searchParams: Promise<
   return (
     <PosApp
       user={{ name: user.name, role: user.role }}
-      outlet={{ id: outlet.id, name: outlet.name, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate }}
+      outlet={{ id: outlet.id, name: outlet.name, taxRate: outlet.taxRate, serviceRate: outlet.serviceRate, maxDiscountPercent: outlet.maxDiscountPercent }}
       categories={categories}
       tables={tables.map((t) => ({ id: t.id, name: t.name, area: t.area, capacity: t.capacity, busy: t.orders.length > 0 }))}
       openBills={openBills.map((o) => ({

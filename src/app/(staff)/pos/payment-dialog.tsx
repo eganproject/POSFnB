@@ -35,7 +35,7 @@ export function PaymentDialog({
 }: {
   orderId: string | null;
   onClose: () => void;
-  config: { demo: boolean; clientKey: string; isProduction: boolean };
+  config: { demo: boolean; online: boolean; clientKey: string; isProduction: boolean };
 }) {
   const [order, setOrder] = useState<PaymentOrder | null>(null);
   const [mode, setMode] = useState<Mode>("full");
@@ -257,7 +257,7 @@ export function PaymentDialog({
                   </div>
 
                   <div className="grid grid-cols-3 gap-2">
-                    {METHODS.map((m) => (
+                    {METHODS.filter((m) => m.v !== "MIDTRANS" || config.online).map((m) => (
                       <button
                         key={m.v}
                         onClick={() => setMethod(m.v)}
