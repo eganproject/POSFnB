@@ -64,7 +64,7 @@ export function CartSheet({
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [note, setNote] = useState("");
-  const [pay, setPay] = useState<"ONLINE" | "CASHIER">("ONLINE");
+  const [pay, setPay] = useState<"ONLINE" | "CASHIER">(outlet.onlinePay ? "ONLINE" : "CASHIER");
   const [submitting, setSubmitting] = useState(false);
   const [nameError, setNameError] = useState<string | null>(null);
 
@@ -275,7 +275,10 @@ export function CartSheet({
                   {[
                     { v: "ONLINE" as const, icon: CreditCard, title: "Bayar sekarang", desc: "QRIS, GoPay, ShopeePay, Virtual Account, kartu" },
                     { v: "CASHIER" as const, icon: Banknote, title: "Bayar di kasir", desc: "Pesanan dikonfirmasi staf, bayar tunai / EDC" },
-                  ].filter((o) => !(scheduled && o.v === "CASHIER")).map((o) => (
+                  ]
+                    .filter((o) => o.v !== "ONLINE" || outlet.onlinePay)
+                    .filter((o) => !(scheduled && o.v === "CASHIER"))
+                    .map((o) => (
                     <button
                       key={o.v}
                       type="button"
@@ -295,6 +298,11 @@ export function CartSheet({
                       <span className={cn("size-5 rounded-full border-2", pay === o.v ? "border-[6px] border-primary" : "border-muted-foreground/30")} />
                     </button>
                   ))}
+                  {scheduled && !outlet.onlinePay && (
+                    <p className="rounded-2xl border border-dashed p-3.5 text-sm text-muted-foreground">
+                      Pesanan terjadwal harus dibayar online, dan pembayaran online belum aktif. Pilih ambil secepatnya untuk bayar di kasir.
+                    </p>
+                  )}
                 </div>
               </section>
 

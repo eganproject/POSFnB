@@ -38,14 +38,14 @@ type OpenBill = {
 
 export function PosApp(props: {
   user: { name: string; role: Role };
-  outlet: { id: string; name: string; taxRate: number; serviceRate: number };
+  outlet: { id: string; name: string; taxRate: number; serviceRate: number; maxDiscountPercent: number };
   categories: MenuCategory[];
   tables: Table[];
   openBills: OpenBill[];
   shift: { id: string; openedAt: string; openingCash: number } | null;
   initialOrderId: string | null;
   requestCount: number;
-  payment: { demo: boolean; clientKey: string; isProduction: boolean };
+  payment: { demo: boolean; online: boolean; clientKey: string; isProduction: boolean };
 }) {
   const { user, outlet, categories, tables, openBills, shift } = props;
   const router = useRouter();
@@ -59,6 +59,7 @@ export function PosApp(props: {
   const [tableId, setTableId] = useState<string | null>(null);
   const [customer, setCustomer] = useState("");
   const [discount, setDiscount] = useState(0);
+  const [discountReason, setDiscountReason] = useState("");
   const [panel, setPanel] = useState<"cart" | "bills">("cart");
   const [tablePicker, setTablePicker] = useState(false);
   const [optionsFor, setOptionsFor] = useState<{ product: MenuProduct; emoji: string | null } | null>(null);
@@ -107,11 +108,17 @@ export function PosApp(props: {
     setLines([]);
     setCustomer("");
     setDiscount(0);
+    setDiscountReason("");
     setTableId(null);
   };
 
+  // Kasir dibatasi persentase diskon outlet; owner bebas
+  const maxDiscount = user.role === "OWNER" ? subtotal : Math.floor((subtotal * outlet.maxDiscountPercent) / 100);
+
   const submit = async (andPay: boolean) => {
     if (!lines.length) return;
+    if (discount > maxDiscount) return toast.error(`Diskon kasir maksimal ${outlet.maxDiscountPercent}% dari subtotal`);
+    if (discount > 0 && discountReason.trim().length < 3) return toast.error("Isi alasan diskon");
     if (type === "DINE_IN" && !tableId) {
       setTablePicker(true);
       return toast.error("Pilih meja dulu");
@@ -122,6 +129,7 @@ export function PosApp(props: {
       tableId,
       customerName: customer || null,
       discount,
+      discountReason: discount > 0 ? discountReason.trim() : null,
       lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity, optionIds: l.optionIds, note: l.note || null })),
     });
     setSaving(null);
@@ -231,7 +239,7 @@ export function PosApp(props: {
                     <div className="flex items-center justify-between gap-2 text-muted-foreground">
                       <span>Diskon</span>
                       <div className="flex items-center gap-1">
-                        {[0, 10, 20].map((pct) => (
+                        {[0, 10, 20].filter((pct) => user.role === "OWNER" || pct <= outlet.maxDiscountPercent).map((pct) => (
                           <button
                             key={pct}
                             onClick={() => setDiscount(Math.round((subtotal * pct) / 100))}
@@ -242,13 +250,22 @@ export function PosApp(props: {
                         ))}
                         <Input
                           value={discount ? String(discount) : ""}
-                          onChange={(e) => setDiscount(Math.min(subtotal, Number(e.target.value.replace(/\D/g, "")) || 0))}
+                          onChange={(e) => setDiscount(Math.min(maxDiscount, Number(e.target.value.replace(/\D/g, "")) || 0))}
                           placeholder="0"
                           inputMode="numeric"
                           className="h-7 w-24 text-right text-xs"
                         />
                       </div>
                     </div>
+                  )}
+                  {canDiscount && discount > 0 && (
+                    <Input
+                      value={discountReason}
+                      onChange={(e) => setDiscountReason(e.target.value)}
+                      placeholder="Alasan diskon (wajib), mis. member, promo"
+                      maxLength={120}
+                      className="h-8 text-xs"
+                    />
                   )}
                   {totals.serviceCharge > 0 && (
                     <div className="flex justify-between text-muted-foreground">
