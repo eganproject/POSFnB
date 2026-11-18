@@ -8,13 +8,15 @@ import { id as localeId } from "date-fns/locale";
 import { ArrowLeft, Banknote, Bell, Check, ChefHat, Clock, CreditCard, HandPlatter, PartyPopper, Receipt, UtensilsCrossed, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatRupiah, pad } from "@/lib/utils";
-import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
 import { useRealtime } from "@/hooks/use-realtime";
 import { itemProgress, itemStatusLabel } from "@/lib/order-flow";
 import { useSnap } from "@/hooks/use-snap";
 import { Button } from "@/components/ui/button";
 import { DemoPaymentDialog } from "@/components/shared/demo-payment";
+import { CorePayment, type ChannelOption } from "@/components/shared/core-payment";
 import { callStaff, startOnlinePayment, switchToCashier } from "@/server/actions/customer";
+import { paymentLabel } from "@/lib/payment-channels";
+import type { OnlinePaymentView } from "@/lib/payment-view";
 
 type TrackerOrder = {
   id: string;
@@ -45,7 +47,15 @@ type TrackerOrder = {
   ahead: number;
   etaMinutes: number | null;
   items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; status: OrderItemStatus; modifiers: string[] }[];
-  payments: { id: string; method: PaymentMethod; amount: number; gatewayType: string | null }[];
+  payments: { id: string; method: PaymentMethod; amount: number; gatewayType: string | null; gatewayChannel: string | null }[];
+};
+
+export type TrackerPaymentConfig = {
+  demo: boolean;
+  mode: "snap" | "core";
+  clientKey: string;
+  isProduction: boolean;
+  channels: ChannelOption[];
 };
 
 const STEPS: { key: OrderStatus; label: string; icon: typeof Check }[] = [
@@ -66,20 +76,22 @@ const ORDER_INDEX: Record<OrderStatus, number> = { PENDING: 0, CONFIRMED: 1, PRE
 export function OrderTracker({
   order,
   autoPay,
-  demo,
-  clientKey,
-  isProduction,
+  payment,
+  pendingPayment,
 }: {
   order: TrackerOrder;
   autoPay: boolean;
-  demo: boolean;
-  clientKey: string;
-  isProduction: boolean;
+  payment: TrackerPaymentConfig;
+  /** Tagihan online yang masih menunggu dibayar */
+  pendingPayment: OnlinePaymentView | null;
 }) {
   const router = useRouter();
+  const { demo, clientKey, isProduction } = payment;
+  const core = payment.mode === "core";
   const remaining = Math.max(0, order.total - order.paid);
   const needsOnlinePay = order.status !== "CANCELLED" && order.payPreference === "MIDTRANS" && remaining > 0;
-  const snap = useSnap(clientKey, isProduction, !demo && needsOnlinePay);
+  const snap = useSnap(clientKey, isProduction, !core && !demo && needsOnlinePay);
+  const paySection = useRef<HTMLElement>(null);
   const [paying, setPaying] = useState(false);
   const [demoPayment, setDemoPayment] = useState<string | null>(null);
   const autoTried = useRef(false);
@@ -111,9 +123,9 @@ export function OrderTracker({
     }
   }, [order.status]);
 
-  // Polling status Midtrans (webhook tidak sampai ke localhost)
+  // Polling status Midtrans Snap (webhook tidak sampai ke localhost). Core API dicek oleh CorePayment.
   useEffect(() => {
-    if (demo || !order.pendingPaymentId || !needsOnlinePay) return;
+    if (core || demo || !order.pendingPaymentId || !needsOnlinePay) return;
     const id = order.pendingPaymentId;
     const check = async () => {
       const res = await fetch(`/api/payments/${id}/sync`, { method: "POST" }).then((r) => r.json()).catch(() => null);
@@ -121,7 +133,7 @@ export function OrderTracker({
     };
     const t = setInterval(check, 5000);
     return () => clearInterval(t);
-  }, [demo, order.pendingPaymentId, needsOnlinePay, router]);
+  }, [core, demo, order.pendingPaymentId, needsOnlinePay, router]);
 
   const pay = useCallback(async () => {
     setPaying(true);
@@ -137,7 +149,7 @@ export function OrderTracker({
       return;
     }
     const sync = () => fetch(`/api/payments/${res.data.paymentId}/sync`, { method: "POST" }).finally(() => router.refresh());
-    const opened = snap.pay(res.data.token, {
+    const opened = res.data.token && snap.pay(res.data.token, {
       onSuccess: () => {
         toast.success("Pembayaran berhasil!");
         sync();
@@ -155,11 +167,20 @@ export function OrderTracker({
 
   useEffect(() => {
     if (!autoPay || autoTried.current || !needsOnlinePay) return;
+    if (core) {
+      // Core API: pelanggan memilih metode di halaman ini, cukup arahkan ke bagian bayar
+      autoTried.current = true;
+      router.replace(`/order/${order.id}`, { scroll: false });
+      setTimeout(() => paySection.current?.scrollIntoView({ behavior: "smooth", block: "start" }), 300);
+      return;
+    }
     if (!demo && !snap.ready) return;
     autoTried.current = true;
     router.replace(`/order/${order.id}`, { scroll: false });
     pay();
-  }, [autoPay, needsOnlinePay, demo, snap.ready, pay, order.id, router]);
+  }, [autoPay, needsOnlinePay, core, demo, snap.ready, pay, order.id, router]);
+
+  const startCore = useCallback((channel: Parameters<typeof startOnlinePayment>[1]) => startOnlinePayment(order.id, channel), [order.id]);
 
   const idx = ORDER_INDEX[order.status];
   // Status per item hanya bermakna setelah pesanan masuk dapur
@@ -214,8 +235,26 @@ export function OrderTracker({
         </section>
 
         {/* Pembayaran */}
-        {needsOnlinePay && (
-          <section className="space-y-3 rounded-3xl border-2 border-primary/30 bg-primary/5 p-5">
+        {needsOnlinePay && core && (
+          <section ref={paySection} className="scroll-mt-4 space-y-4 rounded-3xl border-2 border-primary/30 bg-card p-5 shadow-sm">
+            <CorePayment
+              amount={remaining}
+              channels={payment.channels}
+              initial={pendingPayment}
+              start={startCore}
+              demo={demo}
+              onPaid={() => {
+                toast.success("Pembayaran berhasil! Pesanan diteruskan ke dapur.");
+                navigator.vibrate?.(120);
+                router.refresh();
+              }}
+              onChange={() => router.refresh()}
+            />
+            {order.status === "PENDING" && !order.pickupLabel && <SwitchToCashier orderId={order.id} />}
+          </section>
+        )}
+        {needsOnlinePay && !core && (
+          <section ref={paySection} className="space-y-3 rounded-3xl border-2 border-primary/30 bg-primary/5 p-5">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-muted-foreground">Total yang harus dibayar</p>
@@ -226,20 +265,7 @@ export function OrderTracker({
             <Button size="xl" className="w-full" loading={paying} onClick={pay} disabled={!demo && !snap.ready}>
               Bayar sekarang
             </Button>
-            {order.status === "PENDING" && !order.pickupLabel && (
-              <button
-                onClick={async () => {
-                  const r = await switchToCashier(order.id);
-                  if (r.ok) {
-                    toast.success("Silakan bayar di kasir");
-                    router.refresh();
-                  } else toast.error(r.error);
-                }}
-                className="w-full text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline"
-              >
-                Bayar di kasir saja
-              </button>
-            )}
+            {order.status === "PENDING" && !order.pickupLabel && <SwitchToCashier orderId={order.id} />}
           </section>
         )}
 
@@ -315,7 +341,7 @@ export function OrderTracker({
             </div>
             {order.payments.map((p) => (
               <div key={p.id} className="flex justify-between text-success">
-                <span>Dibayar · {p.gatewayType ? p.gatewayType.replace(/_/g, " ").toUpperCase() : PAYMENT_METHOD_LABEL[p.method]}</span>
+                <span>Dibayar · {paymentLabel(p).replace(/^Online · /, "")}</span>
                 <span className="tabular">{formatRupiah(p.amount)}</span>
               </div>
             ))}
@@ -363,6 +389,28 @@ export function OrderTracker({
         }}
       />
     </div>
+  );
+}
+
+function SwitchToCashier({ orderId }: { orderId: string }) {
+  const router = useRouter();
+  const [busy, setBusy] = useState(false);
+  return (
+    <button
+      disabled={busy}
+      onClick={async () => {
+        setBusy(true);
+        const r = await switchToCashier(orderId);
+        setBusy(false);
+        if (r.ok) {
+          toast.success("Silakan bayar di kasir");
+          router.refresh();
+        } else toast.error(r.error);
+      }}
+      className="w-full text-center text-sm font-medium text-muted-foreground underline-offset-4 hover:underline disabled:opacity-50"
+    >
+      Bayar di kasir saja
+    </button>
   );
 }
 

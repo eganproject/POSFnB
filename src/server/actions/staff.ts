@@ -10,6 +10,8 @@ import { channels, publish } from "@/lib/events";
 import { OrderError, cartLineSchema, computeTotals } from "@/server/pricing";
 import { addManualPayment, audit, createGatewayPayment, createOrder, notifyOrder, payOrdersBatch, recordRefund, resyncOrderStatus, setItemStatus, setOrderStatus, voidPendingGatewayPayments } from "@/server/orders";
 import { isMidtransEnabled } from "@/server/midtrans";
+import { CORE_CHANNELS, type CoreChannel } from "@/lib/payment-channels";
+import { toPaymentView, type OnlinePaymentView } from "@/lib/payment-view";
 import { shiftSummary } from "@/server/reports";
 
 export type Result<T = undefined> = { ok: true; data: T } | { ok: false; error: string };
@@ -182,19 +184,39 @@ export async function payOrder(input: z.input<typeof paySchema>): Promise<Result
   }
 }
 
+const staffOnlineSchema = z.object({
+  orderId: z.string().min(1),
+  amount: z.number().int().positive().optional(),
+  label: z.string().trim().max(40).optional(),
+  channel: z.enum(CORE_CHANNELS).nullable().optional(),
+  items: z.array(z.object({ itemId: z.string().min(1), quantity: z.number().int().positive() })).max(100).optional(),
+});
+
+/** Kasir menagih via Midtrans: Snap (popup) atau Core API (QR tampil di dialog kasir) */
 export async function startStaffOnlinePayment(
   orderId: string,
   amount?: number,
-  label?: string
-): Promise<Result<{ paymentId: string; token: string; demo: boolean; redirectUrl: string | null }>> {
+  label?: string,
+  channel?: CoreChannel | null,
+  items?: { itemId: string; quantity: number }[]
+): Promise<Result<OnlinePaymentView>> {
   try {
     const { user, outlet } = await ctx(["OWNER", "KASIR"]);
-    const order = await db.order.findUnique({ where: { id: orderId } });
+    const d = staffOnlineSchema.parse({ orderId, amount, label, channel, items });
+    const order = await db.order.findUnique({ where: { id: d.orderId } });
     if (!order || order.outletId !== outlet.id) throw new OrderError("Pesanan tidak ditemukan.");
     const shift = await openShiftFor(user.id, outlet.id);
     if (!shift) throw new OrderError("Buka shift kasir terlebih dahulu.");
-    const p = await createGatewayPayment({ orderId, amount, label, shiftId: shift.id, userId: user.id });
-    return { ok: true, data: { paymentId: p.id, token: p.snapToken!, demo: !(await isMidtransEnabled()), redirectUrl: p.snapRedirectUrl } };
+    const p = await createGatewayPayment({
+      orderId: d.orderId,
+      amount: d.amount,
+      label: d.label,
+      shiftId: shift.id,
+      userId: user.id,
+      channel: d.channel ?? null,
+      splitItems: d.items?.length ? d.items : null,
+    });
+    return { ok: true, data: toPaymentView(p, !(await isMidtransEnabled())) };
   } catch (e) {
     return fail(e);
   }
@@ -270,7 +292,7 @@ export async function getOrderForPayment(orderId: string) {
       unitPrice: i.unitPrice,
       modifiers: (i.modifiers as { option: string }[]).map((m) => m.option),
     })),
-    payments: o.payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, state: p.state, label: p.label, changeAmount: p.changeAmount })),
+    payments: o.payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, state: p.state, label: p.label, changeAmount: p.changeAmount, gatewayChannel: p.gatewayChannel, gatewayType: p.gatewayType })),
   };
 }
 export type PaymentOrder = NonNullable<Awaited<ReturnType<typeof getOrderForPayment>>>;

@@ -1,5 +1,6 @@
 import "server-only";
-import { Prisma } from "@prisma/client";
+import { Prisma, type PaymentMethod } from "@prisma/client";
+import { paymentLabel } from "@/lib/payment-channels";
 import { db } from "@/lib/db";
 
 const TZ = process.env.APP_TIMEZONE || "Asia/Jakarta";
@@ -68,14 +69,23 @@ export async function salesByCategory(outletId: string, r: Range) {
   return rows.map((x) => ({ name: x.name ?? "Lainnya", revenue: Number(x.revenue), qty: Number(x.qty) }));
 }
 
+/** Penjualan per metode bayar; pembayaran online dirinci per kanal (QRIS, GoPay, BNI VA, ...) */
 export async function salesByPaymentMethod(outletId: string, r: Range) {
-  const rows = await db.$queryRaw<{ method: string; amount: bigint; count: bigint }[]>`
-    SELECT p.method, SUM(p.amount) AS amount, COUNT(*) AS count
+  const rows = await db.$queryRaw<{ method: PaymentMethod; channel: string | null; amount: bigint; count: bigint }[]>`
+    SELECT p.method, CASE WHEN p.method = 'MIDTRANS' THEN COALESCE(p."gatewayChannel", p."gatewayType") END AS channel,
+           SUM(p.amount) AS amount, COUNT(*) AS count
     FROM "Payment" p JOIN "Order" o ON o.id = p."orderId"
     WHERE o."outletId" = ${outletId} AND o."businessDate" BETWEEN ${r.from} AND ${r.to}
       AND p.state = 'SUCCESS' AND o.status <> 'CANCELLED'
-    GROUP BY p.method ORDER BY amount DESC`;
-  return rows.map((x) => ({ method: x.method, amount: Number(x.amount), count: Number(x.count) }));
+    GROUP BY 1, 2 ORDER BY amount DESC`;
+  return rows.map((x) => ({
+    key: `${x.method}:${x.channel ?? ""}`,
+    method: x.method,
+    channel: x.channel,
+    label: paymentLabel({ method: x.method, gatewayChannel: x.channel }),
+    amount: Number(x.amount),
+    count: Number(x.count),
+  }));
 }
 
 export async function salesByHour(outletId: string, r: Range) {

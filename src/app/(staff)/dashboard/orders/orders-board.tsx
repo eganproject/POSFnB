@@ -8,7 +8,7 @@ import { id as localeId } from "date-fns/locale";
 import { Bell, Check, CheckCheck, ChefHat, CreditCard, HandPlatter, Minus, Printer, QrCode, Receipt, Search, ShoppingBag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatRupiah, pad } from "@/lib/utils";
-import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
+import { paymentLabel } from "@/lib/payment-channels";
 import { Button } from "@/components/ui/button";
 import { Input, Textarea } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -41,7 +41,7 @@ export type BoardOrder = {
   createdAt: string;
   cancelReason: string | null;
   items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; status: OrderItemStatus; modifiers: string[] }[];
-  payments: { id: string; method: PaymentMethod; amount: number; state: PaymentState; label: string | null; createdAt: string }[];
+  payments: { id: string; method: PaymentMethod; amount: number; state: PaymentState; label: string | null; gatewayChannel: string | null; gatewayType: string | null; createdAt: string }[];
 };
 
 const TABS = [
@@ -382,7 +382,7 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
           {o.payments.map((p) => (
             <div key={p.id} className={cn("flex justify-between text-xs", p.state === "SUCCESS" ? "text-success" : "text-muted-foreground line-through")}>
               <span>
-                {PAYMENT_METHOD_LABEL[p.method]}
+                {paymentLabel(p)}
                 {p.label ? ` · ${p.label}` : ""} {p.state !== "SUCCESS" && `(${p.state.toLowerCase()})`}
               </span>
               <span className="tabular">{formatRupiah(p.amount)}</span>

@@ -2,12 +2,14 @@ import { db } from "@/lib/db";
 import { applyGatewayState } from "@/server/orders";
 import { mapMidtransState, verifySignature, type MidtransStatus } from "@/server/midtrans";
 import { getMidtransConfig } from "@/server/settings";
+import { channelFromStatus } from "@/lib/payment-channels";
 
 export const runtime = "nodejs";
 
 /**
  * Webhook Midtrans (Payment Notification URL).
  * Set di dashboard sandbox: https://<domain-publik>/api/midtrans/notification
+ * Dipakai untuk transaksi Snap maupun Core API (format notifikasi & signature sama).
  */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => null)) as MidtransStatus | null;
@@ -19,6 +21,6 @@ export async function POST(request: Request) {
   if (Number(body.gross_amount) !== payment.amount) {
     return Response.json({ message: "amount mismatch" }, { status: 400 });
   }
-  await applyGatewayState(payment.id, mapMidtransState(body), JSON.parse(JSON.stringify(body)), body.payment_type);
+  await applyGatewayState(payment.id, mapMidtransState(body), JSON.parse(JSON.stringify(body)), body.payment_type, channelFromStatus(body));
   return Response.json({ message: "ok" });
 }

@@ -103,6 +103,12 @@ Untuk memakai Midtrans Sandbox sungguhan:
    Alternatif lama tetap jalan: isi `MIDTRANS_SERVER_KEY` & `NEXT_PUBLIC_MIDTRANS_CLIENT_KEY` di `.env` (dipakai bila Pengaturan kosong).
 4. Gunakan [simulator pembayaran sandbox](https://simulator.sandbox.midtrans.com) untuk “membayar” QRIS/VA.
 
+**Snap atau Core API:** di Dashboard → Pengaturan → *Tampilan pembayaran online* owner memilih:
+- **Snap**: popup bawaan Midtrans, semua metode yang aktif di akun langsung muncul.
+- **Core API**: layar bayar sendiri sesuai tema outlet, tanpa popup. QRIS (QR + hitung mundur), GoPay / ShopeePay (buka aplikasi di HP, QR di desktop & kasir), Virtual Account BCA/BNI/BRI/Permata/CIMB dan Mandiri Bill (nomor + tombol salin + cara bayar). Owner memilih metode yang ditawarkan; tombol *Cek metode aktif* membuat transaksi uji Rp10.000 per metode lalu langsung membatalkannya, dan metode yang belum diaktifkan di akun Midtrans otomatis disembunyikan dari pelanggan. Aktifkan metodenya di dashboard Midtrans → Settings → Payment.
+
+Setiap percobaan bayar memakai `order_id` Midtrans sendiri. Ganti metode = percobaan lama dibatalkan (juga di Midtrans); bila percobaan lama tetap terbayar, uangnya tetap tercatat dan kelebihannya muncul di halaman Refund.
+
 **Status pembayaran di localhost:** webhook Midtrans tidak bisa menjangkau `localhost`, jadi aplikasi otomatis **mengecek status transaksi ke API Midtrans** setiap beberapa detik selama ada pembayaran tertunda. Tidak perlu setup tambahan.
 
 Jika punya URL publik, isi **Payment Notification URL** di dashboard Midtrans dengan URL yang tertera di halaman Pengaturan (`https://<domain>/api/midtrans/notification`, signature diverifikasi dengan SHA-512).

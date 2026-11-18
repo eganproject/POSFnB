@@ -37,6 +37,14 @@ export default async function SettingsPage() {
           webhookUrl: `${appBase}/api/midtrans/notification`,
           finishUrl: `${appBase}/order`,
         }}
+        paymentMode={{
+          mode: config.midtrans.mode,
+          modeFromSettings: row?.midtransMode === "snap" || row?.midtransMode === "core",
+          channels: config.midtrans.coreChannels,
+          status: config.midtrans.channelStatus,
+          keysReady: config.midtrans.enabled,
+          isProduction: config.midtrans.isProduction,
+        }}
         google={{
           source: config.google.source,
           storedClientId: row?.googleClientId ?? "",

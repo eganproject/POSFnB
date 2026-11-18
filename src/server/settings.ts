@@ -1,6 +1,7 @@
 import "server-only";
 import crypto from "node:crypto";
 import { db } from "@/lib/db";
+import { normalizeChannels, type CoreChannel, type MidtransMode } from "@/lib/payment-channels";
 
 /**
  * Pengaturan integrasi (Midtrans & Google) yang bisa diubah owner dari dashboard.
@@ -16,7 +17,16 @@ export type MidtransConfig = {
   isProduction: boolean;
   enabled: boolean;
   source: ConfigSource;
+  /** snap = popup Midtrans, core = tampilan bayar sendiri (Core API) */
+  mode: MidtransMode;
+  /** Kanal Core API yang ditawarkan, urut */
+  coreChannels: CoreChannel[];
+  /** Hasil cek kanal terakhir (kanal yang ditolak Midtrans disembunyikan) */
+  channelStatus: ChannelStatusMap;
 };
+
+export type ChannelStatus = { ok: boolean; message: string; at: string };
+export type ChannelStatusMap = Partial<Record<CoreChannel, ChannelStatus>>;
 
 export type GoogleConfig = {
   clientId: string;
@@ -87,12 +97,18 @@ async function loadConfig(): Promise<AppConfig> {
   const envServerKey = process.env.MIDTRANS_SERVER_KEY || "";
   const envClientKey = process.env.NEXT_PUBLIC_MIDTRANS_CLIENT_KEY || "";
   const envProd = process.env.MIDTRANS_IS_PRODUCTION === "true";
+  const envMode = process.env.MIDTRANS_MODE?.toLowerCase() === "core" ? "core" : "snap";
+  const extra = {
+    mode: row?.midtransMode === "core" || row?.midtransMode === "snap" ? row.midtransMode : envMode,
+    coreChannels: normalizeChannels(row?.midtransCoreChannels),
+    channelStatus: (row?.midtransChannelStatus ?? {}) as ChannelStatusMap,
+  } as const;
   const midtrans: MidtransConfig =
     dbServerKey && dbClientKey
-      ? { serverKey: dbServerKey, clientKey: dbClientKey, isProduction: row?.midtransIsProduction ?? envProd, enabled: true, source: "settings" }
+      ? { serverKey: dbServerKey, clientKey: dbClientKey, isProduction: row?.midtransIsProduction ?? envProd, enabled: true, source: "settings", ...extra }
       : envServerKey && envClientKey
-        ? { serverKey: envServerKey, clientKey: envClientKey, isProduction: envProd, enabled: true, source: "env" }
-        : { serverKey: "", clientKey: "", isProduction: false, enabled: false, source: "none" };
+        ? { serverKey: envServerKey, clientKey: envClientKey, isProduction: envProd, enabled: true, source: "env", ...extra }
+        : { serverKey: "", clientKey: "", isProduction: false, enabled: false, source: "none", ...extra };
 
   const dbGoogleId = row?.googleClientId || null;
   const dbGoogleSecret = decryptSecret(row?.googleClientSecret);
@@ -130,4 +146,16 @@ export async function getMidtransConfig() {
 
 export async function getGoogleConfig() {
   return (await getAppConfig()).google;
+}
+
+/** Simpan hasil cek kanal (dipakai untuk menyembunyikan kanal yang belum aktif di Midtrans) */
+export async function saveChannelStatus(update: ChannelStatusMap) {
+  const row = await readSettingsRow();
+  const merged = { ...((row?.midtransChannelStatus ?? {}) as ChannelStatusMap), ...update };
+  await db.appSettings.upsert({
+    where: { id: 1 },
+    create: { id: 1, midtransChannelStatus: merged },
+    update: { midtransChannelStatus: merged },
+  });
+  invalidateAppConfig();
 }

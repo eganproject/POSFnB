@@ -78,7 +78,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     createdAt: o.createdAt.toISOString(),
     cancelReason: o.cancelReason,
     items: o.items.map((i) => ({ id: i.id, name: i.name, quantity: i.quantity, lineTotal: i.lineTotal, note: i.note, status: i.status, modifiers: (i.modifiers as { option: string }[]).map((m) => m.option) })),
-    payments: o.payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, state: p.state, label: p.label, createdAt: p.createdAt.toISOString() })),
+    payments: o.payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, state: p.state, label: p.label, gatewayChannel: p.gatewayChannel, gatewayType: p.gatewayType, createdAt: p.createdAt.toISOString() })),
   });
 
   return (

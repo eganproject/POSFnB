@@ -5,7 +5,9 @@ import { db } from "@/lib/db";
 import { businessDate, formatRupiah } from "@/lib/utils";
 import { channels, publish } from "@/lib/events";
 import { computeTotals, OrderError, priceLines, type CartLineInput } from "./pricing";
-import { createSnapTransaction, expireTransaction, isMidtransEnabled, isOnlinePaymentAvailable } from "./midtrans";
+import { ChargeError, createCoreCharge, createSnapTransaction, demoCoreAction, expireTransaction, isOnlinePaymentAvailable } from "./midtrans";
+import { getMidtransConfig } from "./settings";
+import { CHANNEL_INFO, isCoreChannel, type CoreChannel } from "@/lib/payment-channels";
 import { moneyState } from "@/lib/payment-math";
 import {
   FlowError,
@@ -464,60 +466,195 @@ export async function payOrdersBatch(p: {
   return { total: result.total, change: result.change };
 }
 
-/** Buat pembayaran online (Midtrans Snap). Mode demo hanya jika diizinkan. */
+export type SplitItem = { itemId: string; quantity: number };
+
+/** Transaksi Snap masih bisa dipakai ulang selama ini (Snap berlaku 30 menit) */
+const SNAP_REUSE_MS = 25 * 60 * 1000;
+/** Transaksi Core API dipakai ulang hanya jika masih berlaku minimal selama ini */
+const CORE_REUSE_MARGIN_MS = 90 * 1000;
+
+/** Transaksi Midtrans untuk percobaan ini sudah selesai dibuat */
+function isPrepared(p: { gatewayMode: string | null; gatewayAction: unknown; snapToken: string | null }) {
+  return p.gatewayMode === "core" ? Boolean(p.gatewayAction) : Boolean(p.snapToken);
+}
+
+function sameSplit(a: unknown, b: SplitItem[] | null) {
+  const norm = (x: unknown) =>
+    JSON.stringify(
+      ((Array.isArray(x) ? x : []) as SplitItem[])
+        .map((i) => ({ itemId: i.itemId, quantity: i.quantity }))
+        .sort((p, q) => p.itemId.localeCompare(q.itemId))
+    );
+  return norm(a) === norm(b);
+}
+
+/**
+ * Buat pembayaran online lewat Midtrans (Snap atau Core API, sesuai Pengaturan). Mode demo hanya jika diizinkan.
+ *
+ * Aturan agar data pembayaran tidak ambigu:
+ * - Satu percobaan bayar = satu baris Payment = satu order_id Midtrans (gatewayOrderId unik).
+ * - Baris Payment dibuat & disimpan DULU, baru transaksi dibuat di Midtrans, sehingga notifikasi
+ *   Midtrans selalu menemukan pembayarannya.
+ * - Permintaan yang sama (nominal, mode, kanal, item split) memakai ulang transaksi yang masih berlaku.
+ * - Percobaan baru dengan kanal / nominal lain membatalkan percobaan pending sebelumnya (juga di Midtrans).
+ *   Bila ternyata percobaan lama tetap dibayar, pembayaran itu tetap dicatat dan kelebihannya muncul di Refund.
+ */
 export async function createGatewayPayment(opts: {
   orderId: string;
   amount?: number;
   label?: string | null;
   shiftId?: string | null;
   userId?: string | null;
+  /** Wajib untuk mode Core API */
+  channel?: CoreChannel | null;
+  /** Split bill per item: item ditandai lunas saat pembayaran ini berhasil */
+  splitItems?: SplitItem[] | null;
 }) {
   if (!(await isOnlinePaymentAvailable())) throw new OrderError("Pembayaran online belum aktif. Silakan bayar di kasir.");
-  const order = await db.order.findUnique({ where: { id: opts.orderId }, include: { outlet: true, payments: true, refunds: true } });
-  if (!order) throw new OrderError("Pesanan tidak ditemukan.");
-  if (order.status === "CANCELLED") throw new OrderError("Pesanan sudah dibatalkan.");
-  const remaining = moneyState(order).remaining;
-  if (remaining <= 0) throw new OrderError("Pesanan sudah lunas.");
-  const amount = Math.min(Math.round(opts.amount ?? remaining), remaining);
-  if (amount <= 0) throw new OrderError("Nominal pembayaran tidak valid.");
-
-  // Pakai ulang transaksi pending dengan nominal sama agar tidak dobel
-  const existing = await db.payment.findFirst({
-    where: { orderId: order.id, method: "MIDTRANS", state: "PENDING", amount, snapToken: { not: null } },
-    orderBy: { createdAt: "desc" },
-  });
-  if (existing && Date.now() - existing.createdAt.getTime() < 25 * 60 * 1000) return existing;
-
-  const gatewayOrderId = `${order.code}-${randomCode(3)}`;
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-  let snapToken = `demo-${randomCode(10)}`;
-  let redirectUrl: string | null = null;
-  if (await isMidtransEnabled()) {
-    const snap = await createSnapTransaction({
-      orderId: gatewayOrderId,
-      amount,
-      itemName: `${order.outlet.name} #${order.queueNumber}`,
-      customerName: order.customerName,
-      customerPhone: order.customerPhone,
-      finishUrl: `${appUrl}/order/${order.id}`,
-    });
-    snapToken = snap.token;
-    redirectUrl = snap.redirectUrl;
+  const cfg = await getMidtransConfig();
+  const live = cfg.enabled;
+  const mode = cfg.mode;
+  const channel = mode === "core" ? opts.channel ?? null : null;
+  if (mode === "core") {
+    if (!channel || !isCoreChannel(channel)) throw new OrderError("Pilih metode pembayaran.");
+    if (!cfg.coreChannels.includes(channel)) throw new OrderError(`${CHANNEL_INFO[channel].label} tidak tersedia di outlet ini.`);
+    const st = cfg.channelStatus[channel];
+    if (st && !st.ok) throw new OrderError(st.message);
   }
-  return db.payment.create({
-    data: {
-      orderId: order.id,
-      method: "MIDTRANS",
-      state: "PENDING",
-      amount,
-      label: opts.label ?? null,
-      gatewayOrderId,
-      snapToken,
-      snapRedirectUrl: redirectUrl,
-      shiftId: opts.shiftId ?? null,
-      receivedById: opts.userId ?? null,
-    },
-  });
+  const splitItems = opts.splitItems?.filter((i) => i.quantity > 0) ?? null;
+
+  const step = await db.$transaction(async (tx) => {
+    await lockOrder(tx, opts.orderId);
+    const order = await tx.order.findUnique({ where: { id: opts.orderId }, include: { outlet: true, payments: true, refunds: true, items: true } });
+    if (!order) throw new OrderError("Pesanan tidak ditemukan.");
+    if (order.status === "CANCELLED") throw new OrderError("Pesanan sudah dibatalkan.");
+    const remaining = moneyState(order).remaining;
+    if (remaining <= 0) throw new OrderError("Pesanan sudah lunas.");
+    const amount = Math.min(Math.round(opts.amount ?? remaining), remaining);
+    if (amount <= 0) throw new OrderError("Nominal pembayaran tidak valid.");
+    if (splitItems?.length) {
+      for (const sel of splitItems) {
+        const item = order.items.find((i) => i.id === sel.itemId);
+        if (!item || sel.quantity < 1 || item.paidQty + sel.quantity > item.quantity) throw new OrderError("Item split bill tidak valid.");
+      }
+    }
+
+    const now = Date.now();
+    const pending = order.payments
+      .filter((p) => p.method === "MIDTRANS" && p.state === "PENDING")
+      .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+    const gatewayMode = mode;
+    const reusable = pending.find((p) => {
+      if (p.amount !== amount || (p.gatewayMode ?? "snap") !== gatewayMode || !sameSplit(p.splitItems, splitItems)) return false;
+      if (gatewayMode === "core" && p.gatewayChannel !== channel) return false;
+      // Sedang dibuat oleh permintaan lain (klik dua kali) → tunggu hasilnya
+      if (!isPrepared(p)) return now - p.createdAt.getTime() < 30_000;
+      if (gatewayMode === "snap") return now - p.createdAt.getTime() < SNAP_REUSE_MS;
+      return Boolean(p.expiresAt && p.expiresAt.getTime() - now > CORE_REUSE_MARGIN_MS);
+    });
+    if (reusable) return { kind: "reuse" as const, payment: reusable };
+
+    // Percobaan lain yang masih pending dibatalkan supaya hanya ada satu tagihan online aktif
+    const superseded = pending;
+    if (superseded.length) {
+      await tx.payment.updateMany({ where: { id: { in: superseded.map((p) => p.id) }, state: "PENDING" }, data: { state: "FAILED" } });
+    }
+    const payment = await tx.payment.create({
+      data: {
+        orderId: order.id,
+        method: "MIDTRANS",
+        state: "PENDING",
+        amount,
+        label: opts.label ?? null,
+        gatewayOrderId: `${order.code}-${randomCode(4)}`,
+        gatewayMode,
+        gatewayChannel: channel,
+        splitItems: splitItems?.length ? splitItems : undefined,
+        shiftId: opts.shiftId ?? null,
+        receivedById: opts.userId ?? null,
+      },
+    });
+    return {
+      kind: "new" as const,
+      payment,
+      order,
+      superseded: superseded.flatMap((p) => (p.gatewayOrderId ? [p.gatewayOrderId] : [])),
+    };
+  }, { timeout: 15_000 });
+
+  if (step.kind === "reuse") {
+    if (isPrepared(step.payment)) return step.payment;
+    // Tunggu permintaan lain selesai membuat transaksi
+    for (let i = 0; i < 20; i++) {
+      await new Promise((r) => setTimeout(r, 500));
+      const p = await db.payment.findUnique({ where: { id: step.payment.id } });
+      if (!p || p.state !== "PENDING") break;
+      if (isPrepared(p)) return p;
+    }
+    throw new OrderError("Pembayaran sedang disiapkan. Coba lagi sebentar.");
+  }
+
+  if (step.superseded.length) publish(channels.order(step.order.id), { type: "payment.updated", orderId: step.order.id });
+  for (const id of step.superseded) await expireTransaction(id);
+
+  const { payment, order } = step;
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000").replace(/\/$/, "");
+  const itemName = `${order.outlet.name} #${order.queueNumber}`;
+  try {
+    if (mode === "snap") {
+      let snapToken = `demo-${randomCode(10)}`;
+      let redirectUrl: string | null = null;
+      if (live) {
+        const snap = await createSnapTransaction({
+          orderId: payment.gatewayOrderId!,
+          amount: payment.amount,
+          itemName,
+          customerName: order.customerName,
+          customerPhone: order.customerPhone,
+          finishUrl: `${appUrl}/order/${order.id}`,
+        });
+        snapToken = snap.token;
+        redirectUrl = snap.redirectUrl;
+      }
+      return await db.payment.update({ where: { id: payment.id }, data: { snapToken, snapRedirectUrl: redirectUrl } });
+    }
+    const ch = channel!;
+    if (!live) {
+      return await db.payment.update({
+        where: { id: payment.id },
+        data: {
+          gatewayAction: demoCoreAction(ch, payment.gatewayOrderId!),
+          expiresAt: new Date(Date.now() + CHANNEL_INFO[ch].expiryMinutes * 60_000),
+        },
+      });
+    }
+    const charge = await createCoreCharge(
+      {
+        orderId: payment.gatewayOrderId!,
+        amount: payment.amount,
+        channel: ch,
+        itemName,
+        customerName: order.customerName,
+        customerPhone: order.customerPhone,
+        callbackUrl: `${appUrl}/order/${order.id}`,
+      },
+      cfg
+    );
+    return await db.payment.update({
+      where: { id: payment.id },
+      data: { gatewayAction: charge.action, expiresAt: charge.expiresAt, gatewayType: ch === "qris" ? "qris" : undefined },
+    });
+  } catch (e) {
+    // Percobaan gagal dibuat: tandai gagal agar tidak dianggap tagihan aktif
+    await db.payment.updateMany({
+      where: { id: payment.id, state: "PENDING" },
+      data: { state: "FAILED", gatewayRaw: { error: e instanceof Error ? e.message : String(e) } },
+    });
+    if (e instanceof ChargeError) throw new OrderError(e.message);
+    if (e instanceof OrderError) throw e;
+    console.error("Gagal membuat transaksi Midtrans", e);
+    throw new OrderError(e instanceof Error && e.message ? `Midtrans: ${e.message}` : "Gagal membuat transaksi pembayaran. Coba lagi.");
+  }
 }
 
 /**
@@ -529,7 +666,9 @@ export async function applyGatewayState(
   paymentId: string,
   state: PaymentState,
   raw?: Prisma.InputJsonValue,
-  gatewayType?: string
+  gatewayType?: string,
+  /** Kanal spesifik (mis. bni_va) dari notifikasi; kanal yang sudah tercatat tidak ditimpa */
+  gatewayChannel?: string | null
 ) {
   const first = await db.payment.findUnique({ where: { id: paymentId } });
   if (!first) return null;
@@ -543,9 +682,19 @@ export async function applyGatewayState(
         state,
         gatewayRaw: raw,
         gatewayType: gatewayType ?? payment.gatewayType,
+        gatewayChannel: payment.gatewayChannel ?? gatewayChannel ?? null,
         paidAt: state === "SUCCESS" ? new Date() : null,
       },
     });
+    // Split bill per item yang dibayar online: tandai item lunas (tidak melebihi jumlah item)
+    if (state === "SUCCESS" && Array.isArray(payment.splitItems)) {
+      for (const sel of payment.splitItems as SplitItem[]) {
+        const item = await tx.orderItem.findUnique({ where: { id: sel.itemId } });
+        if (!item || item.orderId !== payment.orderId) continue;
+        const qty = Math.min(sel.quantity, item.quantity - item.paidQty);
+        if (qty > 0) await tx.orderItem.update({ where: { id: item.id }, data: { paidQty: { increment: qty } } });
+      }
+    }
     const rc = await recalcPaymentTx(tx, payment.orderId);
     if (state === "SUCCESS" && rc.money.refundDue > 0) {
       await audit(tx, {
