@@ -1,7 +1,7 @@
 "use client";
 import { useSyncExternalStore } from "react";
 
-export type StaffAlert = { id: string; kind: "bill" | "waiter" | "order"; title: string; at: number; read: boolean };
+export type StaffAlert = { id: string; kind: "bill" | "waiter" | "order" | "ready"; title: string; at: number; read: boolean };
 
 /** Riwayat notifikasi staf selama tab terbuka (tidak disimpan ke server) */
 let alerts: StaffAlert[] = [];

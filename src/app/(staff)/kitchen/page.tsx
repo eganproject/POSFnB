@@ -41,7 +41,7 @@ export default async function KitchenPage() {
           name: i.name,
           quantity: i.quantity,
           note: i.note,
-          isDone: i.isDone,
+          status: i.status,
           modifiers: (i.modifiers as { option: string }[]).map((m) => m.option),
         })),
       }))}

@@ -127,7 +127,16 @@ export function MenuApp({
     if (ordersOpen) loadSummaries();
   }, [ordersOpen, loadSummaries]);
   const activeIds = (summaries ?? []).filter((o) => isActiveOrder(o.status)).map((o) => o.id).join(",");
-  useRealtime(activeIds ? `/api/stream/orders?ids=${activeIds}` : null, () => loadSummaries(), { refresh: false });
+  useRealtime(
+    activeIds ? `/api/stream/orders?ids=${activeIds}` : null,
+    (msg) => {
+      if (msg.type === "items.ready" && msg.items?.length) {
+        toast.success(msg.allReady ? `Pesanan #${msg.queueNumber} sudah siap! 🎉` : `${msg.items.join(", ")} sudah siap 🎉`);
+      }
+      loadSummaries();
+    },
+    { refresh: false }
+  );
   useEffect(() => {
     const onVisible = () => document.visibilityState === "visible" && loadSummaries();
     document.addEventListener("visibilitychange", onVisible);

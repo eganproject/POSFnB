@@ -5,7 +5,7 @@ import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import { id as localeId } from "date-fns/locale";
 import { Dialog as D } from "radix-ui";
-import { Bell, BellOff, ChevronRight, Menu, MonitorSmartphone, PanelLeftClose, PanelLeftOpen, Receipt, Search, Smartphone } from "lucide-react";
+import { Bell, BellOff, ChevronRight, HandPlatter, Menu, MonitorSmartphone, PanelLeftClose, PanelLeftOpen, Receipt, Search, Smartphone } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/misc";
@@ -14,7 +14,7 @@ import { currentPage } from "./nav";
 import { Clock } from "./clock";
 import { clearAlerts, markAllRead, useAlerts, type StaffAlert } from "./alerts-store";
 
-const ALERT_ICON = { bill: Receipt, waiter: Bell, order: Smartphone } satisfies Record<StaffAlert["kind"], unknown>;
+const ALERT_ICON = { bill: Receipt, waiter: Bell, order: Smartphone, ready: HandPlatter } satisfies Record<StaffAlert["kind"], unknown>;
 
 function Notifications() {
   const alerts = useAlerts();
@@ -54,7 +54,7 @@ function Notifications() {
               const Icon = ALERT_ICON[a.kind];
               return (
                 <li key={a.id} className={cn("flex items-start gap-3 px-4 py-3 animate-fade-up", !a.read && "bg-primary/[0.04]")}>
-                  <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", a.kind === "order" ? "bg-info/10 text-info" : "bg-primary/10 text-primary")}>
+                  <span className={cn("grid size-8 shrink-0 place-items-center rounded-lg", a.kind === "order" ? "bg-info/10 text-info" : a.kind === "ready" ? "bg-success/10 text-success" : "bg-primary/10 text-primary")}>
                     <Icon className="size-4" />
                   </span>
                   <div className="min-w-0 flex-1">

@@ -7,7 +7,7 @@ import { db } from "@/lib/db";
 import { assertUser, canAccessOutlet, getActiveOutlet } from "@/lib/session";
 import { channels, publish } from "@/lib/events";
 import { OrderError, cartLineSchema, computeTotals } from "@/server/pricing";
-import { addManualPayment, createGatewayPayment, createOrder, setOrderStatus } from "@/server/orders";
+import { addManualPayment, createGatewayPayment, createOrder, notifyOrder, resyncOrderStatus, setItemStatus, setOrderStatus } from "@/server/orders";
 import { isMidtransEnabled } from "@/server/midtrans";
 import { shiftSummary } from "@/server/reports";
 
@@ -47,14 +47,23 @@ export async function updateOrderStatus(orderId: string, status: OrderStatus, re
   }
 }
 
-export async function toggleItemDone(itemId: string, done: boolean): Promise<Result> {
+const itemStatusSchema = z.object({
+  orderId: z.string().min(1),
+  itemIds: z.array(z.string().min(1)).min(1).max(50),
+  to: z.enum(["QUEUED", "PREPARING", "READY", "SERVED"]),
+  expected: z.enum(["QUEUED", "PREPARING", "READY", "SERVED"]).optional(),
+});
+
+/** Ubah status item (per item atau beberapa sekaligus). Status pesanan ikut dihitung ulang di server. */
+export async function updateItemStatus(input: z.input<typeof itemStatusSchema>): Promise<Result<{ status: OrderStatus }>> {
   try {
-    const { outlet } = await ctx(["OWNER", "KASIR", "DAPUR"]);
-    const item = await db.orderItem.findUnique({ where: { id: itemId }, include: { order: true } });
-    if (!item || item.order.outletId !== outlet.id) throw new OrderError("Item tidak ditemukan.");
-    await db.orderItem.update({ where: { id: itemId }, data: { isDone: done } });
-    publish(channels.outlet(outlet.id), { type: "order.updated", orderId: item.orderId });
-    return { ok: true, data: undefined };
+    const data = itemStatusSchema.parse(input);
+    // Mengantar (atau membatalkan tanda antar) boleh pelayan; memasak hanya dapur/kasir/owner
+    const serving = data.to === "SERVED" || (data.to === "READY" && data.expected === "SERVED");
+    const { outlet } = await ctx(serving ? ["OWNER", "KASIR", "DAPUR", "PELAYAN"] : ["OWNER", "KASIR", "DAPUR"]);
+    const res = await setItemStatus(data, { outletId: outlet.id });
+    revalidatePath("/dashboard/orders");
+    return { ok: true, data: res };
   } catch (e) {
     return fail(e);
   }
@@ -309,7 +318,9 @@ export async function adjustOrderItem(itemId: string, quantity: number): Promise
     if (["COMPLETED", "CANCELLED"].includes(order.status)) throw new OrderError("Pesanan sudah selesai / dibatalkan.");
     if (!Number.isInteger(quantity) || quantity < 0 || quantity > item.quantity) throw new OrderError("Jumlah tidak valid.");
     if (quantity === 0 && order.items.length === 1) throw new OrderError("Ini item terakhir. Batalkan pesanan jika tidak jadi.");
-    await db.$transaction(async (tx) => {
+    const synced = await db.$transaction(async (tx) => {
+      // Kunci pesanan dulu agar tidak balapan dengan dapur yang sedang mengubah status item
+      await tx.$queryRaw`SELECT "id" FROM "Order" WHERE "id" = ${order.id} FOR UPDATE`;
       if (quantity === 0) await tx.orderItem.delete({ where: { id: itemId } });
       else await tx.orderItem.update({ where: { id: itemId }, data: { quantity, lineTotal: item.unitPrice * quantity } });
       const items = await tx.orderItem.findMany({ where: { orderId: order.id } });
@@ -317,9 +328,10 @@ export async function adjustOrderItem(itemId: string, quantity: number): Promise
       await tx.order.update({ where: { id: order.id }, data: computeTotals(subtotal, order.outlet, order.discount) });
       // Transaksi online lama nominalnya sudah tidak cocok
       await tx.payment.updateMany({ where: { orderId: order.id, state: "PENDING" }, data: { state: "FAILED" } });
+      // Item yang tersisa bisa jadi sudah siap semua → status pesanan ikut berubah
+      return resyncOrderStatus(tx, order.id);
     });
-    publish(channels.outlet(outlet.id), { type: "order.updated", orderId: order.id });
-    publish(channels.order(order.id), { type: "order.updated", orderId: order.id });
+    notifyOrder(outlet.id, order.id, synced && synced.status !== synced.prev ? synced.status : undefined);
     revalidatePath("/dashboard/orders");
     return { ok: true, data: undefined };
   } catch (e) {

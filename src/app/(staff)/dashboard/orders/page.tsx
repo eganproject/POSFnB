@@ -46,7 +46,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
 
   const include = {
     table: { select: { name: true } },
-    items: true,
+    items: { orderBy: { id: "asc" as const } },
     payments: { where: { state: "SUCCESS" as const } },
   };
   const [orders, counts, requests, selected] = await Promise.all([
@@ -77,7 +77,7 @@ export default async function OrdersPage({ searchParams }: { searchParams: Promi
     paid: o.payments.filter((p) => p.state === "SUCCESS").reduce((s, p) => s + p.amount, 0),
     createdAt: o.createdAt.toISOString(),
     cancelReason: o.cancelReason,
-    items: o.items.map((i) => ({ id: i.id, name: i.name, quantity: i.quantity, lineTotal: i.lineTotal, note: i.note, modifiers: (i.modifiers as { option: string }[]).map((m) => m.option) })),
+    items: o.items.map((i) => ({ id: i.id, name: i.name, quantity: i.quantity, lineTotal: i.lineTotal, note: i.note, status: i.status, modifiers: (i.modifiers as { option: string }[]).map((m) => m.option) })),
     payments: o.payments.map((p) => ({ id: p.id, method: p.method, amount: p.amount, state: p.state, label: p.label, createdAt: p.createdAt.toISOString() })),
   });
 

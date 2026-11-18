@@ -1,13 +1,14 @@
 import type { Prisma } from "@prisma/client";
 import { pickupLabel } from "@/lib/pickup-label";
 import type { OrderSummary } from "@/lib/order-summary";
+import { itemProgress } from "@/lib/order-flow";
 
 const TZ = process.env.APP_TIMEZONE || "Asia/Jakarta";
 
 export const orderSummaryInclude = {
   outlet: { select: { name: true, slug: true, takeawayEnabled: true, isActive: true } },
   table: { select: { name: true } },
-  items: { select: { name: true, quantity: true }, orderBy: { id: "asc" } },
+  items: { select: { name: true, quantity: true, status: true }, orderBy: { id: "asc" } },
 } satisfies Prisma.OrderInclude;
 
 type Row = Prisma.OrderGetPayload<{ include: typeof orderSummaryInclude }>;
@@ -19,6 +20,7 @@ export function toOrderSummary(o: Row, { withDate = false }: { withDate?: boolea
   // Gabungkan item bernama sama (beda varian) agar ringkasan tetap pendek
   const merged = new Map<string, number>();
   for (const i of o.items) merged.set(i.name, (merged.get(i.name) ?? 0) + i.quantity);
+  const progress = itemProgress(o.items);
   return {
     id: o.id,
     queueNumber: o.queueNumber,
@@ -34,6 +36,8 @@ export function toOrderSummary(o: Row, { withDate = false }: { withDate?: boolea
     place: o.table ? o.table.name : pickup ? `Takeaway · ambil ${pickup}` : "Takeaway",
     outletName: o.outlet.name,
     items: [...merged].map(([name, quantity]) => ({ name, quantity })),
+    itemsDone: progress.done,
+    itemsTotal: progress.total,
     reorderHref: o.outlet.isActive && o.outlet.takeawayEnabled ? `/m/${o.outlet.slug}?reorder=${o.id}` : null,
   };
 }

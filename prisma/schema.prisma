@@ -238,6 +238,19 @@ enum OrderStatus {
   CANCELLED
 }
 
+/// Status per item di dapur. Status pesanan (Diterima/Dimasak/Siap/Selesai)
+/// diturunkan dari status item-itemnya (lihat src/lib/order-flow.ts).
+enum OrderItemStatus {
+  /// Antre, belum mulai dibuat
+  QUEUED
+  /// Sedang disiapkan dapur / barista
+  PREPARING
+  /// Siap diantar / diambil
+  READY
+  /// Sudah diantar ke meja / diambil pelanggan
+  SERVED
+}
+
 enum PaymentStatus {
   UNPAID
   PARTIAL
@@ -323,10 +336,15 @@ model OrderItem {
   modifiers Json     @default("[]")
   note      String?
   lineTotal Int
-  /// Tandai sudah disiapkan di layar dapur
-  isDone    Boolean  @default(false)
+  /// Status item di dapur (status pesanan diturunkan dari sini)
+  status    OrderItemStatus @default(QUEUED)
+  startedAt DateTime?
+  readyAt   DateTime?
+  servedAt  DateTime?
   /// Jumlah yang sudah dibayar (untuk split bill per item)
   paidQty   Int      @default(0)
+
+  @@index([orderId, status])
 }
 
 model Payment {

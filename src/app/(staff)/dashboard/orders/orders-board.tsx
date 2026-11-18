@@ -2,10 +2,10 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import type { OrderSource, OrderStatus, OrderType, PaymentMethod, PaymentState, PaymentStatus, Role } from "@prisma/client";
+import type { OrderItemStatus, OrderSource, OrderStatus, OrderType, PaymentMethod, PaymentState, PaymentStatus, Role } from "@prisma/client";
 import { formatDistanceToNowStrict, format } from "date-fns";
 import { id as localeId } from "date-fns/locale";
-import { Bell, Check, ChefHat, CreditCard, HandPlatter, Minus, Printer, QrCode, Receipt, Search, ShoppingBag, Trash2, X } from "lucide-react";
+import { Bell, Check, CheckCheck, ChefHat, CreditCard, HandPlatter, Minus, Printer, QrCode, Receipt, Search, ShoppingBag, Trash2, X } from "lucide-react";
 import { toast } from "sonner";
 import { cn, formatRupiah, pad } from "@/lib/utils";
 import { PAYMENT_METHOD_LABEL } from "@/lib/constants";
@@ -15,7 +15,8 @@ import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/ui/misc";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, SheetContent } from "@/components/ui/dialog";
 import { OrderStatusBadge, PaymentStatusBadge } from "@/components/shared/status-badge";
-import { adjustOrderItem, resolveRequest, updateOrderStatus } from "@/server/actions/staff";
+import { adjustOrderItem, resolveRequest, updateItemStatus, updateOrderStatus } from "@/server/actions/staff";
+import { itemProgress, itemStatusLabel } from "@/lib/order-flow";
 
 export type BoardOrder = {
   id: string;
@@ -39,7 +40,7 @@ export type BoardOrder = {
   paid: number;
   createdAt: string;
   cancelReason: string | null;
-  items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; modifiers: string[] }[];
+  items: { id: string; name: string; quantity: number; lineTotal: number; note: string | null; status: OrderItemStatus; modifiers: string[] }[];
   payments: { id: string; method: PaymentMethod; amount: number; state: PaymentState; label: string | null; createdAt: string }[];
 };
 
@@ -55,8 +56,8 @@ const TABS = [
 const NEXT: Partial<Record<OrderStatus, { to: OrderStatus; label: string; icon: typeof Check }>> = {
   PENDING: { to: "CONFIRMED", label: "Terima & kirim ke dapur", icon: Check },
   CONFIRMED: { to: "PREPARING", label: "Mulai masak", icon: ChefHat },
-  PREPARING: { to: "READY", label: "Tandai siap", icon: HandPlatter },
-  READY: { to: "COMPLETED", label: "Sudah diantar / diambil", icon: Check },
+  PREPARING: { to: "READY", label: "Tandai semua siap", icon: HandPlatter },
+  READY: { to: "COMPLETED", label: "Semua sudah diantar / diambil", icon: CheckCheck },
 };
 
 export function OrdersBoard({
@@ -191,16 +192,26 @@ function RequestChip({ r }: { r: { id: string; type: string; tableName: string; 
   );
 }
 
+const ITEM_BADGE: Record<OrderItemStatus, string> = {
+  QUEUED: "bg-info/10 text-info",
+  PREPARING: "bg-primary/10 text-primary",
+  READY: "bg-success/15 text-success",
+  SERVED: "bg-muted text-muted-foreground",
+};
+
 function OrderCard({ order: o, href }: { order: BoardOrder; href: string }) {
   const minutes = Math.floor((Date.now() - new Date(o.createdAt).getTime()) / 60000);
   const late = ["CONFIRMED", "PREPARING"].includes(o.status) && minutes >= 20;
+  const p = itemProgress(o.items);
+  const kitchen = ["PREPARING", "READY"].includes(o.status);
   return (
     <Link
       href={href}
       scroll={false}
       className={cn(
         "group flex flex-col gap-3 rounded-2xl border bg-card p-4 shadow-xs transition hover:-translate-y-0.5 hover:shadow-md",
-        o.status === "PENDING" && "border-primary/50 ring-2 ring-primary/15"
+        o.status === "PENDING" && "border-primary/50 ring-2 ring-primary/15",
+        kitchen && p.toServe > 0 && "border-success/50 ring-2 ring-success/15"
       )}
     >
       <div className="flex items-start justify-between gap-2">
@@ -221,6 +232,16 @@ function OrderCard({ order: o, href }: { order: BoardOrder; href: string }) {
       <p className="line-clamp-2 text-sm text-muted-foreground">
         {o.items.map((i) => `${i.quantity}× ${i.name}`).join(", ")}
       </p>
+      {kitchen && p.total > 1 && (
+        <div className="flex flex-wrap items-center gap-1.5 text-xs font-semibold">
+          <span className="rounded-full bg-muted px-2 py-0.5 tabular">{p.done}/{p.total} siap</span>
+          {p.toServe > 0 && (
+            <span className="inline-flex items-center gap-1 rounded-full bg-success/15 px-2 py-0.5 text-success">
+              <HandPlatter className="size-3" /> {p.toServe} item perlu {o.type === "TAKEAWAY" ? "diambil" : "diantar"}
+            </span>
+          )}
+        </div>
+      )}
       <div className="mt-auto flex items-center justify-between border-t pt-3">
         <div className="flex items-center gap-1.5">
           <Badge variant="outline" className="gap-1">
@@ -251,6 +272,15 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
         toast.success("Pesanan diperbarui");
         router.refresh();
       }
+    });
+
+  // Status per item tampil setelah pesanan masuk dapur
+  const itemFlow = ["CONFIRMED", "PREPARING", "READY", "COMPLETED"].includes(o.status);
+  const serve = (itemId: string, expected: OrderItemStatus, to: OrderItemStatus) =>
+    start(async () => {
+      const res = await updateItemStatus({ orderId: o.id, itemIds: [itemId], expected, to });
+      if (!res.ok) toast.error(res.error);
+      router.refresh();
     });
 
   const run = (status: OrderStatus, why?: string) =>
@@ -299,6 +329,24 @@ function OrderDetail({ order: o, role }: { order: BoardOrder; role: Role }) {
                 <p className="font-semibold">{i.name}</p>
                 {i.modifiers.length > 0 && <p className="text-xs text-muted-foreground">{i.modifiers.join(", ")}</p>}
                 {i.note && <p className="text-xs italic text-primary">“{i.note}”</p>}
+                {itemFlow && (
+                  <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                    <span className={cn("rounded-full px-2 py-0.5 text-[11px] font-semibold", ITEM_BADGE[i.status])}>{itemStatusLabel(i.status, o.type)}</span>
+                    {i.status === "READY" && (
+                      <button
+                        onClick={() => serve(i.id, "READY", "SERVED")}
+                        className="inline-flex items-center gap-1 rounded-full bg-success px-2.5 py-0.5 text-[11px] font-semibold text-white hover:bg-success/90"
+                      >
+                        <Check className="size-3" /> {o.type === "TAKEAWAY" ? "Sudah diambil" : "Sudah diantar"}
+                      </button>
+                    )}
+                    {i.status === "SERVED" && o.status !== "COMPLETED" && (
+                      <button onClick={() => serve(i.id, "SERVED", "READY")} className="text-[11px] font-medium text-muted-foreground underline-offset-2 hover:underline">
+                        Batalkan tanda
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
               <div className="flex flex-col items-end gap-1">
                 <span className="tabular">{formatRupiah(i.lineTotal)}</span>

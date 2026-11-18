@@ -38,6 +38,13 @@ export function LiveAlerts({ notifyOrders = true }: { notifyOrders?: boolean }) 
         const title = bill ? `${msg.tableName} minta bill` : `${msg.tableName} memanggil pelayan`;
         pushAlert({ kind: bill ? "bill" : "waiter", title });
         toast.warning(`${bill ? "🧾" : "🛎️"} ${title}`, { duration: 10000 });
+      } else if (msg.type === "items.ready" && notifyOrders && msg.items?.length) {
+        // Item siap diantar (bisa sebagian dari pesanan): beri tahu pelayan / kasir
+        chime(1);
+        const where = msg.tableName ?? "Takeaway";
+        const title = `${where} · #${String(msg.queueNumber ?? "").padStart(2, "0")}: ${msg.items.join(", ")} siap ${msg.tableName ? "diantar" : "diambil"}`;
+        pushAlert({ kind: "ready", title });
+        toast.success(`🍽️ ${title}`, { duration: 6000 });
       } else if (msg.type === "order.created" && notifyOrders && msg.source === "QR") {
         chime(2);
         pushAlert({ kind: "order", title: msg.tableName ? `Pesanan QR baru dari ${msg.tableName}` : "Pesanan QR baru masuk" });
