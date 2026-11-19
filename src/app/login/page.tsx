@@ -28,14 +28,14 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-olive p-12 text-cream lg:flex lg:flex-col lg:justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={BRAND_PHOTOS.interior[0]} alt="" className="absolute inset-0 size-full object-cover opacity-25" />
+        <img src={BRAND_PHOTOS.interior[0]} alt="" className="absolute inset-0 size-full object-cover opacity-40" />
         <div className="absolute inset-0 bg-gradient-to-t from-olive-deep via-olive-deep/70 to-olive/60" />
         <div className="relative flex items-center gap-3">
           <BrandMark className="size-10" />
           <span className="font-display text-3xl leading-none tracking-wide">{BRAND.shortName}</span>
         </div>
         <div className="relative space-y-6">
-          <h1 className="max-w-md font-display text-5xl leading-[1.05]">Selamat bertugas di Warm Hour.</h1>
+          <h1 className="max-w-md font-display text-5xl leading-[1.05]">Selamat bertugas di {BRAND.shortName}.</h1>
           <ul className="space-y-3 text-cream/85">
             {[
               "Tamu pesan & bayar sendiri lewat QR meja",
