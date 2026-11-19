@@ -1,10 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 76">
-  <g fill="none" stroke="#f7f0e4" stroke-linecap="round">
-    <path d="M24.1 47.5 39.9 6.6M45.9 47.5 30.1 6.6" stroke-width="4.3"/>
-    <path d="M28.6 33.3h12.7" stroke-width="3.6"/>
-    <path d="M18.3 71h33.4" stroke-width="4.3"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 260 96">
+  <g transform="translate(106 0) scale(1)">
+    <path d="M9.500 43 22.600 7.200" stroke="#f6f1e6" stroke-width="2" stroke-linecap="round" fill="none"/>
+    <path d="M22.600 5.500c1.200-1.900 3.200-1.900 4 .2L40 43h-6.600L24.600 14.500c-.6-2.600-1.200-5.600-2-9Z" fill="#d9c98c"/>
+    <path d="M17.500 41.500c-.8-8 3-13.800 10.200-16.300 1.300 7.800-2.400 13.800-10.200 16.300Z" fill="#f6f1e6"/>
   </g>
-  <path d="M3 43.3h64a32 25 0 0 1-64 0Z" fill="#f7f0e4"/>
-  <text x="84" y="44" font-family="Georgia, 'Times New Roman', serif" font-size="44" fill="#f7f0e4" letter-spacing="-0.5">Aprez</text>
-  <text x="86" y="68" font-family="Arial, Helvetica, sans-serif" font-size="13.5" font-weight="700" fill="#e9a77f" letter-spacing="7.6">LOCALE</text>
+  <text x="131" y="74" text-anchor="middle" font-family="Georgia, 'Times New Roman', serif" font-size="27" fill="#f6f1e6" letter-spacing="9">APREZ</text>
+  <text x="132.500" y="91" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="9.500" fill="#d9c98c" letter-spacing="6.500">LOCALE</text>
 </svg>

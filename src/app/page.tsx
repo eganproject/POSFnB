@@ -1,91 +1,95 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { ArrowRight, ArrowUpRight, CalendarCheck, MapPin, MessageCircle, QrCode } from "lucide-react";
+import { ArrowRight, ArrowUpRight, CalendarCheck, MapPin, MessageCircle, QrCode, Star } from "lucide-react";
 import { db } from "@/lib/db";
 import { getCurrentUser } from "@/lib/session";
 import { ROLE_HOME } from "@/lib/constants";
-import { BRAND, BRAND_FAMILY, BRAND_PHOTOS, BRAND_ROOMS } from "@/lib/brand";
+import { BRAND, BRAND_FAMILY, BRAND_PHOTOS, BRAND_REVIEWS, BRAND_ROOMS } from "@/lib/brand";
 import { formatRupiah } from "@/lib/utils";
 import { isOpenNow } from "@/lib/pickup";
 import { BrandMark } from "@/components/shared/brand-mark";
 import { LandingMotion } from "@/components/landing/landing-motion";
 import { OrderPhone, type PhoneItem } from "@/components/landing/order-phone";
-import {
-  Chili,
-  HeroBowl,
-  Leaf,
-  Lime,
-  PlateKwayTeow,
-  PlateNasiIkan,
-  PlatePho,
-  Shrimp,
-  Skyline,
-  StarAnise,
-  Stamp,
-  TablePlan,
-} from "@/components/landing/aprez-art";
+import { Monstera, Stamp, TablePlan } from "@/components/landing/aprez-art";
 import "./landing.css";
 
 export const dynamic = "force-dynamic";
 
-const TICKER_A = ["Nasi Ikan Nusantara", "Char Kway Teow", "Pho Noodle", "Tori Uma Rice Bowl", "General Tso's Wings", "Dimsum"];
-const TICKER_B = ["Breakfast buffet 06.00–10.00", "Makan siang", "Makan malam", "Takeaway", "Ruang semi-VIP", "Ramah keluarga"];
+const photo = (name: string) => `/aprez/photos/${name}.jpg`;
 
-/** Tiga hidangan signature yang tersusun di piring saat scroll. `parts` = isi piring, urut sesuai munculnya. */
+const TICKER_A = ["Nasi Ikan Nusantara", "Pho Noodle", "Chef's Salad", "Wagyu Beef Cheek", "Hainanese Chicken Rice", "Strawberry Matcha"];
+const TICKER_B = ["Asian roots", "World flavors", "Breakfast buffet 06.00–10.00", "Locally sourced", "Ruang semi-VIP", "Dine in & takeaway"];
+
+/** Tiga hidangan signature. Fotonya berganti dengan sapuan saat scroll, `parts` muncul satu per satu. */
 const SIGNATURES = [
   {
     name: "Nasi Ikan Nusantara",
     origin: "Nusantara",
-    desc: "Barramundi utuh digoreng renyah, ditemani nasi hangat, sayur lodeh, dan sambal.",
-    parts: ["Nasi putih hangat", "Barramundi goreng utuh", "Sayur lodeh", "Sambal", "Jeruk & daun segar"],
-    Plate: PlateNasiIkan,
+    img: photo("nasi-ikan"),
+    pos: "50% 62%",
+    desc: "Barramundi utuh digoreng renyah di atas daun pisang, ditemani nasi hangat, sayur lodeh, dan sambal.",
+    parts: ["Barramundi goreng utuh", "Nasi putih hangat", "Sayur lodeh", "Sambal", "Daun pisang"],
   },
   {
     name: "Pho Noodle",
     origin: "Vietnam",
-    desc: "Kaldu sapi bening yang dimasak lama, mi beras, dan irisan daging sapi Australia.",
-    parts: ["Kaldu sapi", "Mi beras", "Irisan sapi Australia", "Bakso sapi", "Daun herba & cabai", "Jeruk nipis"],
-    Plate: PlatePho,
+    img: photo("pho"),
+    pos: "50% 50%",
+    desc: "Kaldu sapi bening yang dimasak lama, mi beras, bakso, dan irisan daging sapi Australia.",
+    parts: ["Kaldu sapi", "Mi beras", "Irisan sapi Australia", "Bakso sapi", "Daun herba", "Jeruk nipis & cabai"],
   },
   {
-    name: "Char Kway Teow",
-    origin: "Penang",
-    desc: "Kwetiau lebar dilempar di wajan panas sampai harum smoky.",
-    parts: ["Kwetiau lebar", "Udang", "Tauge", "Kucai", "Telur"],
-    Plate: PlateKwayTeow,
+    name: "Chef's Salad",
+    origin: "Dari kebun lokal",
+    img: photo("chefs-salad"),
+    pos: "50% 55%",
+    desc: "Sayuran segar, smoked beef, keju, apel hijau, dan walnut panggang dengan pommery dressing.",
+    parts: ["Mixed greens", "Smoked beef", "Keju", "Apel hijau", "Walnut panggang", "Pommery dressing"],
   },
 ];
 
-/** Satu hari di Aprez Locale. `hour` menggerakkan matahari di busur dan warna langit. */
+/** Satu hari di Aprez Locale: empat kartu yang bertumpuk saat scroll. */
 const DAY = [
   {
-    hour: 6,
     label: "06.00",
     title: "Sarapan buffet",
-    desc: "Prasmanan pagi pukul 06.00–10.00: hidangan Asia dan Nusantara, pastry, dan pilihan yang lebih ringan.",
+    img: photo("buffet-station"),
+    pos: "50% 50%",
+    desc: "Prasmanan pagi pukul 06.00–10.00 di meja terrazzo hijau: hidangan Asia dan Nusantara, pastry, dan pilihan yang lebih ringan.",
     dishes: ["Breakfast Buffet", "Croque Monsieur"],
   },
   {
-    hour: 12,
     label: "12.00",
     title: "Makan siang",
-    desc: "Comfort food yang mengenyangkan untuk jeda di tengah hari kerja Sudirman.",
-    dishes: ["Nasi Ikan Nusantara", "Char Kway Teow", "Tori Uma Rice Bowl"],
+    img: photo("nusantara-platters"),
+    pos: "50% 60%",
+    desc: "Piring Nusantara yang mengenyangkan untuk jeda di tengah hari kerja Sudirman.",
+    dishes: ["Nasi Ikan Nusantara", "Nasi Bakar Nusantara", "Hainanese Chicken Rice"],
   },
   {
-    hour: 15.5,
     label: "15.30",
     title: "Sore yang pelan",
-    desc: "Kopi, teh, dan dessert hangat sambil menunggu macet reda.",
-    dishes: ["Matcha Bloom", "Warm Baked Apple Crumble", "Cappuccino"],
+    img: photo("coffee-tray"),
+    pos: "50% 62%",
+    desc: "Kopi, minuman dingin dari bar, dan dessert sambil menunggu macet reda.",
+    dishes: ["Ice Cube Latte", "Es Kopi Susu", "Choco Melted"],
   },
   {
-    hour: 19,
     label: "19.00",
     title: "Makan malam",
+    img: photo("beef-cheek"),
+    pos: "50% 40%",
     desc: "Duduk lebih lama bersama keluarga atau tamu, dengan hidangan Asia dan Western.",
-    dishes: ["Wagyu Beef Cheek Estouffade", "Pho Noodle", "General Tso's Chicken Wings"],
+    dishes: ["Wagyu Beef Cheek Estouffade", "Pan Seared Salmon", "Pho Noodle"],
   },
+];
+
+/** Empat minuman di bagian "Dari bar"; tiap kolom bergerak dengan kecepatan berbeda. */
+const BAR = [
+  { name: "Strawberry Matcha", img: photo("strawberry-matcha"), note: "Matcha, susu, stroberi", drift: -46 },
+  { name: "Blue Mojito", img: photo("blue-mojito"), note: "Mint, jeruk nipis, soda", drift: 54 },
+  { name: "Iced Latte", img: photo("iced-latte"), note: "Espresso di atas susu dingin", drift: -24 },
+  { name: "Ice Cube Latte", img: photo("coffee-tray"), note: "Es batu kopi, susu dituang sendiri", drift: 70 },
 ];
 
 const STEPS = [
@@ -97,10 +101,10 @@ const STEPS = [
 
 /** Dipakai mockup HP bila menu di database belum lengkap */
 const PHONE_FALLBACK: PhoneItem[] = [
-  { name: "Nasi Ikan Nusantara", price: 145000, imageUrl: null, emoji: "🐟" },
-  { name: "Es Kopi Susu Gula Aren", price: 45000, imageUrl: null, emoji: "🧋" },
-  { name: "Pho Noodle", price: 115000, imageUrl: null, emoji: "🍜" },
-  { name: "Matcha Bloom", price: 68000, imageUrl: null, emoji: "🍵" },
+  { name: "Nasi Ikan Nusantara", price: 145000, imageUrl: "/aprez/menu/nasi-ikan-nusantara.jpg", emoji: "🐟" },
+  { name: "Es Kopi Susu", price: 45000, imageUrl: "/aprez/menu/es-kopi-susu.jpg", emoji: "🧋" },
+  { name: "Pho Noodle", price: 115000, imageUrl: "/aprez/menu/pho-noodle.jpg", emoji: "🍜" },
+  { name: "Strawberry Matcha", price: 55000, imageUrl: "/aprez/menu/strawberry-matcha.jpg", emoji: "🍓" },
 ];
 
 const clock = (hhmm: string) => hhmm.replace(":", ".");
@@ -124,7 +128,7 @@ export default async function Home() {
   const menuCount = products.length;
 
   const byName = (names: string[]) => names.flatMap((n) => products.filter((p) => p.name === n));
-  const phonePicked = byName(["Nasi Ikan Nusantara", "Es Kopi Susu Gula Aren", "Pho Noodle", "Matcha Bloom"]);
+  const phonePicked = byName(["Nasi Ikan Nusantara", "Es Kopi Susu", "Pho Noodle", "Strawberry Matcha"]);
   const phoneItems: PhoneItem[] = phonePicked.length >= 4 ? phonePicked : PHONE_FALLBACK;
   const menuCats = categories.filter((c) => c.products.length > 0);
 
@@ -132,7 +136,7 @@ export default async function Home() {
     <div className="lp ap">
       <LandingMotion />
       <noscript>
-        <style>{`.ap .lp-rv{opacity:1;transform:none}.ap .ap-part{opacity:1;transform:none}.ap .ap-seat{opacity:1;transform:none}`}</style>
+        <style>{`.ap .lp-rv{opacity:1;transform:none}.ap .ap-seat{opacity:1;transform:none}.ap .ap-chips li{opacity:1;transform:none}`}</style>
       </noscript>
       <div className="lp-progress" aria-hidden />
 
@@ -140,7 +144,7 @@ export default async function Home() {
       <header className="lp-hdr">
         <div className="lp-wrap">
           <Link href="/" className="ap-logo" aria-label={BRAND.name}>
-            <BrandMark className="size-9" />
+            <BrandMark className="size-9" leaf="var(--ap-gold)" />
             <span>
               <b>Aprez</b>
               <small>Locale</small>
@@ -149,6 +153,7 @@ export default async function Home() {
           <nav className="lp-nav">
             <a href="#signature">Signature</a>
             <a href="#hari">Sepanjang hari</a>
+            <a href="#bar">Dari bar</a>
             <a href="#menu">Menu</a>
             <a href="#ruang">Ruang</a>
             <a href="#pesan">Cara pesan</a>
@@ -161,21 +166,21 @@ export default async function Home() {
       </header>
 
       <main className="lp-main">
-        {/* 1. Hero */}
+        {/* 1. Hero: jendela lengkung berisi foto ruang makan, foto hidangan dan daun melayang beda kecepatan */}
         <section className="ap-hero" id="top">
-          <canvas className="ap-steamfx" aria-hidden />
           <div className="ap-ghost" data-heroghost aria-hidden>
-            LOCALE LOCALE
+            LOCALE · LOCALE
           </div>
           <div className="lp-wrap ap-hero-grid">
             <div className="ap-hero-copy">
-              <p className="lp-eyebrow lp-rv">Citadines Sudirman · Setiabudi, Jakarta</p>
+              <p className="lp-eyebrow lp-rv">Citadines Sudirman · Jakarta</p>
               <h1 className="lp-rv" style={delay(0.08)}>
-                Rasa yang akrab,
-                <em> dari pagi sampai malam.</em>
+                Asian roots,
+                <em> world flavors.</em>
               </h1>
               <p className="ap-lead lp-rv" style={delay(0.16)}>
-                Comfort food Asia dan Nusantara, dari sarapan buffet sampai makan malam bersama keluarga. Pesan langsung dari meja lewat QR.
+                Masakan Asia dan Nusantara dari bahan lokal, disajikan dari sarapan sampai makan malam di ruang makan yang teduh dan hijau.
+                Pesan langsung dari meja lewat QR.
               </p>
               <div className="lp-cta lp-rv" style={delay(0.24)}>
                 <Link href={menuHref} className="lp-btn">
@@ -191,8 +196,10 @@ export default async function Home() {
                   <span>setiap hari</span>
                 </li>
                 <li>
-                  <b>06.00–10.00</b>
-                  <span>breakfast buffet</span>
+                  <b>
+                    <Star className="ap-star" aria-hidden /> {BRAND.rating.score}
+                  </b>
+                  <span>{BRAND.rating.count} ulasan Google</span>
                 </li>
                 <li>
                   <b data-count={menuCount} data-ms="1200">
@@ -203,26 +210,34 @@ export default async function Home() {
               </ul>
             </div>
             <div className="ap-hero-art">
-              <div className="ap-sun" data-hero="0.18" aria-hidden />
-              <div className="ap-bowlwrap" data-hero="-0.06">
-                <HeroBowl />
+              <div className="ap-leaf ap-leaf-a" data-hero="0.14" aria-hidden>
+                <Monstera id="ap-mon-a" />
               </div>
-              <div className="ap-float ap-f1" data-hero="-0.5">
-                <Chili className="ap-bob" />
+              <div className="ap-archwrap" data-hero="-0.05">
+                <div className="ap-arch">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={BRAND_PHOTOS.window} alt="Ruang makan Aprez Locale dengan jendela besar menghadap taman" className="ap-par" data-par="0.1" fetchPriority="high" />
+                </div>
               </div>
-              <div className="ap-float ap-f2" data-hero="-0.28">
-                <StarAnise className="ap-spin" />
+              <div className="ap-float ap-disc" data-hero="-0.34">
+                <div data-spin="0.12">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo("pho")} alt="Pho Noodle" />
+                </div>
               </div>
-              <div className="ap-float ap-f3" data-hero="-0.42">
-                <Lime className="ap-bob" />
+              <div className="ap-float ap-snap" data-hero="-0.2">
+                <figure>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={photo("strawberry-matcha")} alt="Strawberry Matcha" />
+                  <figcaption>Strawberry Matcha</figcaption>
+                </figure>
               </div>
-              <div className="ap-float ap-f4" data-hero="-0.2">
-                <Leaf className="ap-sway" />
+              <div className="ap-leaf ap-leaf-b" data-hero="-0.5" aria-hidden>
+                <Monstera id="ap-mon-b" />
               </div>
-              <div className="ap-float ap-f5" data-hero="-0.6">
-                <Shrimp className="ap-bob" />
+              <div className="ap-float ap-stampwrap" data-hero="-0.28" aria-hidden>
+                <Stamp text="ASIAN ROOTS · WORLD FLAVORS · SUDIRMAN · " className="ap-stamp" />
               </div>
-              <Stamp text="ASIAN COMFORT · ALL DAY · SUDIRMAN · " className="ap-stamp" />
             </div>
           </div>
           <a href="#signature" className="lp-scrollhint" aria-label="Gulir ke bawah">
@@ -240,7 +255,7 @@ export default async function Home() {
                   {TICKER_A.map((t) => (
                     <span key={t}>
                       {t}
-                      <i>✺</i>
+                      <i>✦</i>
                     </span>
                   ))}
                 </span>
@@ -263,107 +278,149 @@ export default async function Home() {
           </div>
         </div>
 
-        {/* 2. Signature: piring tersusun mengikuti scroll */}
+        {/* 2. Signature: layar menahan, foto hidangan berganti dengan sapuan mengikuti scroll */}
         <section className="ap-sig" id="signature">
           <div className="ap-pin">
             <div className="lp-wrap ap-sig-grid">
               <div className="ap-sig-copy">
                 <p className="lp-eyebrow">Signature</p>
-                <h2>Satu piring, banyak cerita.</h2>
+                <h2>
+                  Akar Asia, <em>di satu meja.</em>
+                </h2>
                 <div className="ap-sig-cards">
                   {SIGNATURES.map((s, i) => {
                     const price = priceOf(s.name);
                     return (
-                      <article key={s.name} className={`ap-sig-card${i === 0 ? " lp-on" : ""}`} data-sig={i}>
+                      <article key={s.name} className={`ap-sig-card${i === 0 ? " lp-on" : ""}`}>
                         <span className="ap-origin">
                           {String(i + 1).padStart(2, "0")} · {s.origin}
                         </span>
                         <h3>{s.name}</h3>
                         <p>{s.desc}</p>
-                        <ol>
+                        <ul className="ap-chips">
                           {s.parts.map((p, j) => (
                             <li key={p} style={{ "--ap-i": j } as React.CSSProperties}>
                               {p}
                             </li>
                           ))}
-                        </ol>
+                        </ul>
                         {price !== null && <span className="ap-price">{formatRupiah(price)}</span>}
                       </article>
                     );
                   })}
                 </div>
-                <div className="ap-sig-dots" aria-hidden>
-                  {SIGNATURES.map((s) => (
-                    <i key={s.name} />
-                  ))}
-                </div>
               </div>
-              <div className="ap-sig-stage" aria-hidden>
-                <div className="ap-table" />
-                {SIGNATURES.map(({ name, Plate }, i) => (
-                  <div key={name} className={`ap-plate-slot${i === 0 ? " lp-on" : ""}`} data-plate={i}>
-                    <Plate />
+              <div className="ap-sig-stage">
+                <div className="ap-sig-leaf" data-drift="-40" aria-hidden>
+                  <Monstera id="ap-mon-c" />
+                </div>
+                <div className="ap-sig-framewrap">
+                  <div className="ap-sig-frame">
+                    {SIGNATURES.map((s, i) => (
+                      <div key={s.name} className="ap-shot" style={{ zIndex: i + 1 }}>
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={s.img} alt={s.name} loading="lazy" style={{ objectPosition: s.pos }} />
+                      </div>
+                    ))}
                   </div>
-                ))}
-                <div className="ap-chop" />
+                  <div className="ap-sig-count" aria-hidden>
+                    <b>01</b>
+                    <span>/ {String(SIGNATURES.length).padStart(2, "0")}</span>
+                  </div>
+                  <div className="ap-sig-dots" aria-hidden>
+                    {SIGNATURES.map((s) => (
+                      <i key={s.name} />
+                    ))}
+                  </div>
+                </div>
               </div>
             </div>
           </div>
         </section>
 
-        {/* 3. Sepanjang hari: matahari berjalan di busur, langit berganti */}
+        {/* 3. Sepanjang hari: kartu foto yang bertumpuk */}
         <section className="ap-day" id="hari">
-          <div className="lp-wrap ap-day-grid">
-            <div className="ap-sky-col">
-              <div className="ap-sky" aria-hidden>
-                <div className="ap-stars" />
-                <svg viewBox="0 0 400 230" className="ap-arc">
-                  <path d="M20 210a180 180 0 0 1 360 0" />
-                  <path className="ap-arc-done" d="M20 210a180 180 0 0 1 360 0" pathLength="1" />
-                </svg>
-                <div className="ap-orb">
-                  <i />
-                </div>
-                <div className="ap-horizon">
-                  <Skyline layer="mid" />
-                </div>
-                <div className="ap-time">
-                  <b>06.00</b>
-                  <span>Sarapan buffet</span>
-                </div>
-              </div>
-            </div>
-            <div className="ap-moments">
-              <header>
-                <p className="lp-eyebrow">Sepanjang hari</p>
-                <h2 className="lp-rv">Buka sejak matahari terbit.</h2>
-                <p className="lp-rv" style={delay(0.08)}>
-                  Dari sarapan sebelum rapat pertama sampai makan malam setelah semuanya selesai.
-                </p>
-              </header>
-              {DAY.map((m) => (
-                <article key={m.label} className="ap-moment" data-hour={m.hour} data-title={m.title}>
-                  <span className="ap-mtime">{m.label}</span>
-                  <h3>{m.title}</h3>
-                  <p>{m.desc}</p>
-                  <ul>
-                    {m.dishes.map((d) => {
-                      const price = priceOf(d);
-                      return (
-                        <li key={d}>
-                          <span>{d}</span>
-                          {price !== null && <b>{shortPrice(price)}</b>}
-                        </li>
-                      );
-                    })}
-                  </ul>
+          <div className="lp-wrap">
+            <header className="ap-day-head">
+              <p className="lp-eyebrow">Sepanjang hari</p>
+              <h2 className="lp-rv">
+                Buka sejak <em>matahari terbit.</em>
+              </h2>
+              <p className="lp-rv" style={delay(0.08)}>
+                Dari sarapan sebelum rapat pertama sampai makan malam setelah semuanya selesai.
+              </p>
+            </header>
+            <div className="ap-dstack">
+              {DAY.map((m, i) => (
+                <article key={m.label} className="ap-dcard" style={{ "--i": i } as React.CSSProperties}>
+                  <div className="ap-dcard-in">
+                    <div className="ap-dphoto">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={m.img} alt={m.title} loading="lazy" className="ap-par" data-par="0.08" style={{ objectPosition: m.pos }} />
+                      <span className="ap-dtime">{m.label}</span>
+                    </div>
+                    <div className="ap-dtext">
+                      <span className="ap-dnum">
+                        {String(i + 1).padStart(2, "0")} / {String(DAY.length).padStart(2, "0")}
+                      </span>
+                      <h3>{m.title}</h3>
+                      <p>{m.desc}</p>
+                      <ul>
+                        {m.dishes.map((d) => {
+                          const price = priceOf(d);
+                          return (
+                            <li key={d}>
+                              <span>{d}</span>
+                              {price !== null && <b>{shortPrice(price)}</b>}
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </div>
+                  </div>
                 </article>
               ))}
             </div>
           </div>
         </section>
 
-        {/* 4. Menu bergaya buku menu klasik */}
+        {/* 4. Dari bar: empat foto minuman, tiap kolom bergerak dengan kecepatan berbeda */}
+        <section className="ap-bar" id="bar">
+          <div className="ap-bar-leaf" data-drift="90" aria-hidden>
+            <Monstera id="ap-mon-d" />
+          </div>
+          <div className="lp-wrap">
+            <header className="ap-bar-head">
+              <p className="lp-eyebrow">Dari bar</p>
+              <h2 className="lp-rv">
+                Yang dingin, <em>yang berlapis.</em>
+              </h2>
+              <p className="lp-rv" style={delay(0.08)}>
+                Kopi, matcha, dan mocktail yang diracik di bar, enak untuk menemani makan atau sekadar singgah sore.
+              </p>
+            </header>
+            <div className="ap-bar-grid">
+              {BAR.map((d) => {
+                const price = priceOf(d.name);
+                return (
+                  <figure key={d.name} className="ap-drink" data-drift={d.drift}>
+                    <div className="ap-drink-ph">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={d.img} alt={d.name} loading="lazy" className="ap-par" data-par="0.07" />
+                    </div>
+                    <figcaption>
+                      <b>{d.name}</b>
+                      <span>{d.note}</span>
+                      {price !== null && <i>{shortPrice(price)}</i>}
+                    </figcaption>
+                  </figure>
+                );
+              })}
+            </div>
+          </div>
+        </section>
+
+        {/* 5. Menu bergaya buku menu */}
         <section className="ap-menu" id="menu">
           <div className="lp-wrap">
             <div className="ap-menu-head">
@@ -381,15 +438,25 @@ export default async function Home() {
                     <ul>
                       {c.products.map((p) => (
                         <li key={p.name}>
-                          <div className="ap-mrow">
-                            <span className="ap-mname">
-                              {p.name}
-                              {p.isFeatured && <i title="Rekomendasi">✺</i>}
+                          {p.imageUrl ? (
+                            // eslint-disable-next-line @next/next/no-img-element
+                            <img src={p.imageUrl} alt="" loading="lazy" className="ap-mthumb" />
+                          ) : (
+                            <span className="ap-mthumb" aria-hidden>
+                              {p.name.charAt(0)}
                             </span>
-                            <span className="ap-mdots" />
-                            <span className="ap-mprice">{shortPrice(p.price)}</span>
+                          )}
+                          <div>
+                            <div className="ap-mrow">
+                              <span className="ap-mname">
+                                {p.name}
+                                {p.isFeatured && <i title="Rekomendasi">✦</i>}
+                              </span>
+                              <span className="ap-mdots" />
+                              <span className="ap-mprice">{shortPrice(p.price)}</span>
+                            </div>
+                            {p.description && <p>{p.description}</p>}
                           </div>
-                          {p.description && <p>{p.description}</p>}
                         </li>
                       ))}
                     </ul>
@@ -405,62 +472,89 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 5. Jendela parallax: kota Sudirman dari balik lengkung jendela */}
-        <section className="ap-window" aria-label="Lokasi di Sudirman">
-          <div className="ap-wsky" data-band="0.3" />
-          <div className="ap-wlayer ap-wfar" data-band="0.22">
-            <Skyline layer="far" />
-          </div>
-          <div className="ap-wlayer ap-wmid" data-band="0.12">
-            <Skyline layer="mid" />
-          </div>
-          <div className="ap-wlayer ap-wnear" data-band="0.02">
-            <Skyline layer="near" />
-          </div>
-          <div className="lp-wrap ap-wtext" data-bandin>
-            <p className="lp-eyebrow">Lantai dasar Citadines Sudirman</p>
-            <h2>Turun dari kamar, keluar dari kantor, langsung makan.</h2>
+        {/* 6. Pita foto ruang makan: melebar sampai penuh saat masuk layar, fotonya bergerak lebih lambat */}
+        <section className="ap-band" aria-label="Ruang makan Aprez Locale">
+          <div className="ap-band-in">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND_PHOTOS.hall} alt="Ruang makan Aprez Locale: dinding keramik hijau sage, kayu terang, dan lampu putih" loading="lazy" className="ap-par" data-par="0.16" />
+            <div className="lp-wrap ap-band-text" data-drift="-30">
+              <p className="lp-eyebrow">Lantai dasar Citadines Sudirman</p>
+              <h2>Turun dari kamar, keluar dari kantor, langsung makan.</h2>
+            </div>
           </div>
         </section>
 
-        {/* 6. Ruang */}
+        {/* 7. Ruang */}
         <section className="ap-rooms" id="ruang">
-          <div className="lp-wrap">
-            <div className="ap-rooms-head">
-              <p className="lp-eyebrow">Ruang</p>
-              <h2 className="lp-rv">Untuk keluarga, tim, dan rombongan.</h2>
-              <p className="lp-rv" style={delay(0.08)}>
-                Selain ruang makan utama, ada dua ruang semi-VIP untuk makan bersama yang lebih tenang.
-              </p>
+          <div className="lp-wrap ap-rooms-grid">
+            <div className="ap-rooms-photo lp-rv">
+              <div className="ap-rooms-arch">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={BRAND_PHOTOS.privateRoom} alt="Ruang semi-VIP dengan meja panjang dan pohon zaitun" loading="lazy" className="ap-par" data-par="0.1" />
+              </div>
+              <div className="ap-rooms-leaf" data-drift="-50" aria-hidden>
+                <Monstera id="ap-mon-e" />
+              </div>
             </div>
-            <div className="ap-room-grid">
-              {BRAND_ROOMS.map((r, i) => (
-                <article key={r.name} className="ap-room lp-rv" style={delay(i * 0.1)}>
-                  <TablePlan seats={r.guests} />
-                  <div>
-                    <h3>{r.name}</h3>
-                    <p>
-                      Maks. <b>{r.guests} tamu</b> · minimum order {r.minimum}
-                    </p>
-                  </div>
-                </article>
-              ))}
-              <article className="ap-room ap-room-note lp-rv" style={delay(0.2)}>
+            <div>
+              <div className="ap-rooms-head">
+                <p className="lp-eyebrow">Ruang</p>
+                <h2 className="lp-rv">
+                  Untuk keluarga, tim, <em>dan rombongan.</em>
+                </h2>
+                <p className="lp-rv" style={delay(0.08)}>
+                  Selain ruang makan utama, ada dua ruang semi-VIP berpintu kaca untuk rapat makan siang atau makan bersama yang lebih tenang.
+                </p>
+              </div>
+              <div className="ap-room-grid">
+                {BRAND_ROOMS.map((r, i) => (
+                  <article key={r.name} className="ap-room lp-rv" style={delay(i * 0.1)}>
+                    <TablePlan seats={r.guests} />
+                    <div>
+                      <h3>{r.name}</h3>
+                      <p>
+                        Maks. <b>{r.guests} tamu</b> · minimum order {r.minimum}
+                      </p>
+                    </div>
+                  </article>
+                ))}
+              </div>
+              <div className="ap-room-note lp-rv">
                 <ul>
                   <li>Ramah anak &amp; keluarga</li>
-                  <li>Cocok untuk rombongan besar</li>
+                  <li>Cocok untuk rombongan</li>
                   <li>Dine in &amp; takeaway</li>
-                  <li>Reservasi lewat WhatsApp atau Chope</li>
                 </ul>
                 <a href={BRAND.links.reservation} target="_blank" rel="noopener noreferrer" className="lp-btn lp-btn-sm">
                   <CalendarCheck className="size-4" /> Pesan tempat
                 </a>
-              </article>
+              </div>
             </div>
           </div>
         </section>
 
-        {/* 7. Dapur */}
+        {/* 8. Kata tamu */}
+        <section className="ap-said">
+          <div className="lp-wrap ap-said-grid">
+            <div className="ap-score lp-rv">
+              <b>{BRAND.rating.score}</b>
+              <span className="ap-stars" aria-label={`Nilai ${BRAND.rating.score} dari 5`}>
+                {[0, 1, 2, 3, 4].map((k) => (
+                  <Star key={k} aria-hidden />
+                ))}
+              </span>
+              <small>{BRAND.rating.count} ulasan di Google Maps</small>
+            </div>
+            {BRAND_REVIEWS.map((r, i) => (
+              <blockquote key={r.quote} className="lp-rv" style={delay(0.08 * (i + 1))}>
+                <p>“{r.quote}”</p>
+                <footer>{r.by}</footer>
+              </blockquote>
+            ))}
+          </div>
+        </section>
+
+        {/* 9. Dapur */}
         <section className="ap-kitchen">
           <div className="lp-wrap ap-kitchen-grid">
             <div className="lp-rv">
@@ -469,8 +563,6 @@ export default async function Home() {
                 Bahan lokal, rasa yang dikenal,
                 <em> dirapikan untuk hari ini.</em>
               </h2>
-            </div>
-            <div className="lp-rv" style={delay(0.1)}>
               <p>
                 Menu Aprez Locale disusun oleh Chef Stefu Santoso, Corporate Executive Chef Amuz Group. Dapurnya mengutamakan bahan dari
                 produsen lokal dan regional, pendekatan yang mereka sebut <i>soft sustainability</i>.
@@ -484,10 +576,20 @@ export default async function Home() {
                 </ul>
               </div>
             </div>
+            <div className="ap-kitchen-photos lp-rv" style={delay(0.1)}>
+              <div className="ap-kph ap-kph-a" data-drift="-28">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo("banquette")} alt="Bangku panjang dan area buffet" loading="lazy" />
+              </div>
+              <div className="ap-kph ap-kph-b" data-drift="34">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photo("hainan")} alt="Hainanese Chicken Rice" loading="lazy" />
+              </div>
+            </div>
           </div>
         </section>
 
-        {/* 8. Cara pesan */}
+        {/* 10. Cara pesan */}
         <section className="lp-flow" id="pesan">
           <div className="lp-pin">
             <div className="lp-wrap">
@@ -525,9 +627,12 @@ export default async function Home() {
           </div>
         </section>
 
-        {/* 9. Kunjungi */}
+        {/* 11. Kunjungi */}
         <section className="ap-visit" id="kunjungi">
-          <canvas className="ap-steamfx" data-few="1" aria-hidden />
+          <div className="ap-visit-bg" aria-hidden>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={BRAND_PHOTOS.entrance} alt="" loading="lazy" className="ap-par" data-par="0.14" />
+          </div>
           <div className="lp-wrap ap-visit-grid">
             <div>
               <p className="lp-eyebrow">Kunjungi kami</p>
@@ -579,7 +684,7 @@ export default async function Home() {
       <footer className="lp-foot">
         <div className="lp-wrap">
           <b>
-            <BrandMark className="size-5" /> {BRAND.name}
+            <BrandMark className="size-5" leaf="var(--ap-gold)" /> {BRAND.name}
           </b>
           <span>
             <span>Pemesanan meja &amp; kasir oleh {BRAND.poweredBy}</span>

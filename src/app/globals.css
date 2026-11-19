@@ -4,35 +4,35 @@
 
 :root {
   --radius: 0.9rem;
-  /* Aprez Locale: terakota tanah liat, tinta indigo, dan krem kertas nasi */
-  --background: oklch(0.966 0.016 75);
-  --foreground: oklch(0.25 0.035 262);
-  --card: oklch(0.993 0.006 75);
-  --card-foreground: oklch(0.25 0.035 262);
-  --popover: oklch(0.993 0.006 75);
-  --popover-foreground: oklch(0.25 0.035 262);
-  --primary: oklch(0.5 0.13 40);
-  --primary-foreground: oklch(0.98 0.012 75);
-  --secondary: oklch(0.93 0.025 60);
-  --secondary-foreground: oklch(0.36 0.09 40);
-  --muted: oklch(0.945 0.016 70);
-  --muted-foreground: oklch(0.48 0.03 262);
-  --accent: oklch(0.92 0.04 55);
-  --accent-foreground: oklch(0.38 0.1 40);
+  /* Aprez Locale: krem kayu terang, hijau sage keramik, terakota placemat, olive-emas logo */
+  --background: oklch(0.972 0.012 88);
+  --foreground: oklch(0.27 0.03 128);
+  --card: oklch(0.994 0.005 88);
+  --card-foreground: oklch(0.27 0.03 128);
+  --popover: oklch(0.994 0.005 88);
+  --popover-foreground: oklch(0.27 0.03 128);
+  --primary: oklch(0.5 0.125 38);
+  --primary-foreground: oklch(0.985 0.01 88);
+  --secondary: oklch(0.925 0.028 128);
+  --secondary-foreground: oklch(0.36 0.06 130);
+  --muted: oklch(0.948 0.014 100);
+  --muted-foreground: oklch(0.48 0.028 125);
+  --accent: oklch(0.915 0.035 125);
+  --accent-foreground: oklch(0.34 0.06 130);
   --destructive: oklch(0.56 0.19 27);
   --success: oklch(0.58 0.12 150);
   --warning: oklch(0.78 0.13 80);
   --info: oklch(0.58 0.11 245);
-  --border: oklch(0.89 0.022 65);
-  --input: oklch(0.86 0.025 65);
-  --ring: oklch(0.5 0.13 40);
-  --sidebar: oklch(0.255 0.045 265);
-  --sidebar-foreground: oklch(0.95 0.015 75);
+  --border: oklch(0.895 0.02 100);
+  --input: oklch(0.865 0.024 100);
+  --ring: oklch(0.5 0.125 38);
+  --sidebar: oklch(0.29 0.04 132);
+  --sidebar-foreground: oklch(0.955 0.015 95);
   /* Warna khas brand di luar token shadcn (nama token dipertahankan dari tema sebelumnya) */
-  --olive: oklch(0.5 0.13 40);
-  --olive-deep: oklch(0.255 0.045 265);
-  --cream: oklch(0.955 0.02 75);
-  --honey: oklch(0.72 0.12 55);
+  --olive: oklch(0.5 0.125 38);
+  --olive-deep: oklch(0.29 0.04 132);
+  --cream: oklch(0.96 0.018 90);
+  --honey: oklch(0.7 0.09 95);
 }
 
 .dark {
@@ -90,8 +90,8 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-fraunces), Georgia, "Times New Roman", serif;
-  --font-serif: var(--font-fraunces), Georgia, "Times New Roman", serif;
+  --font-display: var(--font-marcellus), Georgia, "Times New Roman", serif;
+  --font-serif: var(--font-instrument), Georgia, "Times New Roman", serif;
   --animate-pop: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
   --animate-fade-up: fade-up 0.35s ease-out both;
   --animate-pulse-ring: pulse-ring 1.6s ease-out infinite;

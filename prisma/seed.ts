@@ -13,12 +13,17 @@ type Item = { name: string; price: number; desc: string; emoji?: string; image?:
 /**
  * Menu Aprez Locale (Citadines Sudirman Jakarta).
  *
- * NAMA HIDANGAN & ISINYA: dari Chope, NOW! Jakarta, dan Nibble.id (Desember 2025 – 2026).
- * HARGA: PERKIRAAN untuk demo (sumber publik tidak mencantumkan harga; Chope menyebut
- *        kisaran Rp 100–250 rb per orang). Ganti dengan harga dari buku menu asli.
- * MINUMAN & PILIHAN (level pedas, suhu, gula): PERKIRAAN, belum dicek ke menu asli.
+ * NAMA HIDANGAN & ISINYA: dari Chope, Grab Dine Out, NOW! Jakarta, Nibble.id, Instagram @aprezlocale.id,
+ *        dan foto pengunjung di Google Maps (November 2026).
+ * FOTO: foto asli dari sumber yang sama, di /public/aprez/menu.
+ * HARGA: PERKIRAAN untuk demo. Sumber publik tidak mencantumkan harga per hidangan; Chope menyebut
+ *        kisaran Rp 100–250 rb per orang. Satu-satunya angka asli: voucher breakfast buffet Rp 871.200
+ *        untuk 4 orang (Rp 217.800 nett per orang, kira-kira Rp 180.000++).
+ *        Ganti dengan harga dari buku menu asli.
+ * PILIHAN (level pedas, suhu, gula): PERKIRAAN, belum dicek ke menu asli.
  */
 const K = 1000;
+const img = (name: string) => `/aprez/menu/${name}.jpg`;
 
 const pilih = (name: string, options: string[], min = 1, max = 1): Group => ({
   name,
@@ -42,7 +47,7 @@ const MENU: { name: string; icon: string; items: Item[] }[] = [
     name: "Sarapan",
     icon: "🌅",
     items: [
-      { name: "Breakfast Buffet", emoji: "🍳", price: 165 * K, desc: "Sarapan prasmanan setiap hari pukul 06.00–10.00: hidangan Asia & Nusantara, pastry, dan pilihan yang lebih ringan. Harga per orang.", featured: true },
+      { name: "Breakfast Buffet", emoji: "🍳", price: 180 * K, desc: "Sarapan prasmanan setiap hari pukul 06.00–10.00: hidangan Asia & Nusantara, pastry, dan pilihan yang lebih ringan. Harga per orang.", featured: true },
       { name: "Croque Monsieur", emoji: "🥪", price: 95 * K, desc: "Roti panggang berisi smoked beef dan keju Emmental yang meleleh.", groups: [kematangan] },
     ],
   },
@@ -50,58 +55,67 @@ const MENU: { name: string; icon: string; items: Item[] }[] = [
     name: "Pembuka & Salad",
     icon: "🥗",
     items: [
-      { name: "Chef's Salad", emoji: "🥗", price: 85 * K, desc: "Mixed greens, keju, smoked beef, brokoli, walnut panggang, bawang, apel hijau, tomat, pommery dressing, dan crostini.", featured: true },
+      { name: "Chef's Salad", image: img("chefs-salad"), emoji: "🥗", price: 85 * K, desc: "Mixed greens, keju, smoked beef, brokoli, walnut panggang, bawang, apel hijau, tomat, pommery dressing, dan crostini.", featured: true },
       { name: "Thai Salad", emoji: "🥗", price: 78 * K, desc: "Salad segar ala Thailand dengan dressing asam-pedas-manis." },
-      { name: "General Tso's Chicken Wings", emoji: "🍗", price: 88 * K, desc: "Sayap ayam renyah berbalut saus General Tso yang manis, gurih, dan sedikit pedas.", featured: true },
+      { name: "General Tso's Chicken Wings", emoji: "🍗", price: 88 * K, desc: "Sayap ayam renyah berbalut saus General Tso yang manis, gurih, dan sedikit pedas." },
       { name: "Dimsum Platter", emoji: "🥟", price: 75 * K, desc: "Aneka dimsum kukus, disajikan dengan saus cocolan." },
       { name: "Double Decker Club Sandwich", emoji: "🥪", price: 98 * K, desc: "Club sandwich bertingkat dua dengan isian lengkap, disajikan dengan kentang goreng." },
     ],
   },
   {
-    name: "Asian Comfort",
+    name: "Asian Roots",
     icon: "🍜",
     items: [
-      { name: "Nasi Ikan Nusantara", emoji: "🐟", price: 145 * K, desc: "Ikan barramundi utuh digoreng renyah, nasi putih hangat, sambal, dan sayur lodeh.", featured: true, groups: [pedas] },
-      { name: "Char Kway Teow", emoji: "🍜", price: 98 * K, desc: "Kwetiau lebar ditumis di wajan panas sampai harum smoky, gaya Penang.", featured: true, groups: [pedas] },
-      { name: "Pho Noodle", emoji: "🍜", price: 115 * K, desc: "Pho sapi ala Vietnam: kaldu sapi, bakso, irisan daging sapi Australia, daun herba segar, dengan jeruk nipis, cabai, dan kecap di samping.", featured: true },
+      { name: "Nasi Ikan Nusantara", image: img("nasi-ikan-nusantara"), emoji: "🐟", price: 145 * K, desc: "Ikan barramundi utuh digoreng renyah, nasi putih hangat, sambal, dan sayur lodeh.", featured: true, groups: [pedas] },
+      { name: "Pho Noodle", image: img("pho-noodle"), emoji: "🍜", price: 115 * K, desc: "Pho sapi ala Vietnam: kaldu sapi, bakso, irisan daging sapi Australia, daun herba segar, dengan jeruk nipis, cabai, dan kecap di samping.", featured: true },
+      { name: "Hainanese Chicken Rice", image: img("hainanese-chicken-rice"), emoji: "🍗", price: 98 * K, desc: "Ayam rebus yang lembut, nasi gurih kaldu ayam, timun, dan saus jahe-cabai.", featured: true },
+      { name: "Nasi Bakar Nusantara", image: img("nasi-bakar"), emoji: "🍙", price: 95 * K, desc: "Nasi berbumbu dibungkus daun pisang lalu dibakar, dengan lauk, lalapan, dan sambal.", groups: [pedas] },
+      { name: "Char Kway Teow", emoji: "🍜", price: 98 * K, desc: "Kwetiau lebar ditumis di wajan panas sampai harum smoky, gaya Penang.", groups: [pedas] },
       { name: "Tori Uma Rice Bowl", emoji: "🍚", price: 95 * K, desc: "Rice bowl ayam gaya Jepang dengan saus gurih-manis." },
     ],
   },
   {
-    name: "Western Favourites",
+    name: "World Flavors",
     icon: "🍽️",
     items: [
-      { name: "Wagyu Beef Cheek Estouffade", emoji: "🥩", price: 195 * K, desc: "Pipi sapi wagyu dimasak perlahan dalam saus estouffade yang pekat sampai empuk.", featured: true },
+      { name: "Wagyu Beef Cheek Estouffade", image: img("wagyu-beef-cheek"), emoji: "🥩", price: 195 * K, desc: "Pipi sapi wagyu dimasak perlahan dalam saus estouffade yang pekat sampai empuk, dengan sayuran dan kentang goreng.", featured: true },
+      { name: "Pan Seared Salmon", image: img("pan-seared-salmon"), emoji: "🐟", price: 185 * K, desc: "Salmon dipanggang di wajan sampai kulitnya renyah, dengan sayuran dan saus." },
+      { name: "Fish & Chips", image: img("fish-and-chips"), emoji: "🐟", price: 118 * K, desc: "Ikan goreng tepung yang renyah, kentang goreng, dan saus tartar." },
+      { name: "Aprez Beef Burger", image: img("burger"), emoji: "🍔", price: 125 * K, desc: "Burger daging sapi dengan keju dan sayuran segar, disajikan dengan kentang goreng." },
+      { name: "Chicken Parmigiana", emoji: "🍗", price: 115 * K, desc: "Ayam goreng tepung dengan saus tomat dan keju yang dipanggang sampai meleleh." },
     ],
   },
   {
     name: "Dessert",
     icon: "🍰",
     items: [
-      { name: "Matcha Bloom", emoji: "🍵", price: 68 * K, desc: "Dessert matcha yang lembut dengan rasa teh hijau yang bersih.", featured: true },
+      { name: "Choco Melted", image: img("choco-melted"), emoji: "🍫", price: 65 * K, desc: "Kue cokelat dengan bagian tengah yang lumer, disajikan dengan es krim.", featured: true },
+      { name: "Matcha Bloom", emoji: "🍵", price: 68 * K, desc: "Dessert matcha yang lembut dengan rasa teh hijau yang bersih." },
       { name: "Warm Baked Apple Crumble", emoji: "🥧", price: 65 * K, desc: "Apel panggang hangat dengan crumble mentega yang renyah." },
-      { name: "Choco Melted", emoji: "🍫", price: 65 * K, desc: "Kue cokelat dengan bagian tengah yang lumer." },
     ],
   },
   {
     name: "Kopi",
     icon: "☕",
     items: [
-      { name: "Espresso", emoji: "☕", price: 35 * K, desc: "Satu shot espresso." },
+      { name: "Es Kopi Susu", image: img("es-kopi-susu"), emoji: "🧋", price: 45 * K, desc: "Espresso, susu segar, dan gula aren. Bisa less sugar.", featured: true, groups: [gula, susu] },
+      { name: "Iced Latte", image: img("iced-latte"), emoji: "🥛", price: 48 * K, desc: "Espresso di atas susu dingin, berlapis rapi di gelas.", groups: [gula, susu] },
+      { name: "Ice Cube Latte", image: img("ice-cube-latte"), emoji: "🧊", price: 55 * K, desc: "Es batu dari kopi, disajikan dengan sebotol susu dingin untuk dituang sendiri.", featured: true },
+      { name: "Sea Salt Coffee", emoji: "☕", price: 50 * K, desc: "Kopi susu dingin dengan krim sea salt yang gurih di atasnya.", groups: [gula] },
       { name: "Americano", emoji: "☕", price: 40 * K, desc: "Espresso dengan air.", groups: [suhu(3 * K)] },
       { name: "Cappuccino", emoji: "☕", price: 48 * K, desc: "Espresso, susu steamed, dan foam tebal.", groups: [suhu(3 * K), susu] },
-      { name: "Café Latte", emoji: "☕", price: 48 * K, desc: "Espresso dengan susu yang lembut.", groups: [suhu(3 * K), susu] },
-      { name: "Es Kopi Susu Gula Aren", emoji: "🧋", price: 45 * K, desc: "Espresso, susu segar, dan gula aren.", groups: [gula, susu] },
     ],
   },
   {
-    name: "Teh & Segar",
+    name: "Dari Bar",
     icon: "🍹",
     items: [
+      { name: "Strawberry Matcha", image: img("strawberry-matcha"), emoji: "🍓", price: 55 * K, desc: "Matcha, susu, dan saus stroberi berlapis tiga warna.", featured: true, groups: [gula] },
+      { name: "Blue Mojito", image: img("blue-mojito"), emoji: "🍹", price: 52 * K, desc: "Mocktail biru yang segar dengan daun mint, jeruk nipis, dan soda.", featured: true },
+      { name: "Taro Milk", image: img("taro-milk"), emoji: "🥤", price: 48 * K, desc: "Susu taro dingin yang lembut dan manis.", groups: [gula] },
+      { name: "Strawberry Milkshake", image: img("strawberry-milkshake"), emoji: "🍓", price: 55 * K, desc: "Milkshake stroberi yang kental." },
+      { name: "Vanilla Milkshake", image: img("vanilla-shake"), emoji: "🥤", price: 55 * K, desc: "Milkshake vanila klasik." },
       { name: "Teh Melati", emoji: "🫖", price: 35 * K, desc: "Teh melati seduh, panas atau dingin.", groups: [suhu()] },
-      { name: "Iced Lemon Tea", emoji: "🍋", price: 38 * K, desc: "Teh dingin dengan perasan lemon.", groups: [gula] },
-      { name: "Matcha Latte", emoji: "🍵", price: 50 * K, desc: "Matcha dengan susu, panas atau dingin.", groups: [suhu(3 * K), gula, susu] },
-      { name: "Fresh Juice", emoji: "🧃", price: 45 * K, desc: "Jus buah segar, tanya pilihan buah hari ini ke staf.", groups: [pilih("Buah", ["Jeruk", "Semangka", "Nanas", "Apel"])] },
       { name: "Air Mineral", emoji: "💧", price: 20 * K, desc: "Air mineral botol." },
     ],
   },
@@ -147,12 +161,12 @@ async function main() {
     data: {
       name: "Aprez Locale",
       slug: "aprez-locale",
-      address: "Citadines Sudirman Jakarta, Jl. Karet Sawah No.219, Setiabudi, Jakarta Selatan 12930",
+      address: "Citadines Sudirman Jakarta, Jl. Karet Sawah No.219, Karet Semanggi, Setiabudi, Jakarta Selatan 12930",
       phone: "0852-8570-6736",
-      // PERKIRAAN: Chope menulis harga "++" (pajak & service belum termasuk). PB1 Jakarta 10%,
-      // service 5% belum dicek ke struk asli.
+      // PERKIRAAN: Chope menulis harga "++" (pajak & service belum termasuk). PB1 Jakarta 10% dan
+      // service 10% (lazim di restoran hotel), belum dicek ke struk asli.
       taxRate: 10,
-      serviceRate: 5,
+      serviceRate: 10,
       openTime: "06:00",
       closeTime: "22:00",
       receiptFooter: "Terima kasih sudah makan di Aprez Locale. Sampai jumpa lagi! IG @aprezlocale.id",

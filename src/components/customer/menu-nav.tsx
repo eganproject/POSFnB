@@ -96,7 +96,7 @@ export function InfoSheet({ open, onOpenChange, outlet }: { open: boolean; onOpe
       <DrawerContent>
         <div className="space-y-3 overflow-y-auto px-5 pb-safe pt-3">
           <div className="relative aspect-[16/7] overflow-hidden rounded-2xl bg-muted">
-            <Image src={BRAND_PHOTOS.front} alt={`Suasana ${BRAND.name}`} fill sizes="(max-width: 640px) 100vw, 576px" className="object-cover" unoptimized={BRAND_PHOTOS.front.endsWith(".svg")} />
+            <Image src={BRAND_PHOTOS.front} alt={`Suasana ${BRAND.name}`} fill sizes="(max-width: 640px) 100vw, 576px" className="object-cover" />
           </div>
           <div>
             <DrawerTitle className="font-display text-3xl leading-tight tracking-wide">{outlet.name}</DrawerTitle>

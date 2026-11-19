@@ -3,36 +3,14 @@ import { useEffect } from "react";
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const hhmm = (hour: number) => {
-  const m = Math.round((hour * 60) / 10) * 10;
-  return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}.${String(m % 60).padStart(2, "0")}`;
-};
-
-/** Warna langit per jam (fajar, siang, sore keemasan, senja, malam) */
-const SKY: [number, [number, number, number]][] = [
-  [6, [246, 201, 160]],
-  [9, [246, 226, 196]],
-  [12, [243, 233, 214]],
-  [15.5, [240, 176, 128]],
-  [17.5, [196, 104, 76]],
-  [19, [35, 44, 69]],
-];
-const skyAt = (hour: number) => {
-  let i = 1;
-  while (i < SKY.length - 1 && hour > SKY[i][0]) i++;
-  const [h0, c0] = SKY[i - 1];
-  const [h1, c1] = SKY[i];
-  const t = clamp((hour - h0) / (h1 - h0));
-  return c0.map((v, k) => Math.round(lerp(v, c1[k], t))).join(" ");
-};
-
-type Wisp = { x: number; y: number; r: number; vy: number; sway: number; o: number; life: number };
+const smooth = (t: number) => t * t * (3 - 2 * t);
 
 /**
  * Mesin animasi landing Aprez Locale. Tidak merender apa pun; ia hanya menggerakkan elemen di dalam `.lp`:
- * elemen muncul saat terlihat, bahan-bahan hero melayang dengan kecepatan berbeda, dua pita bersilang,
- * piring signature yang tersusun mengikuti scroll, matahari yang berjalan di busur sepanjang hari,
- * jendela kota berlapis, HP peraga alur pesan, dan uap hangat yang naik.
+ * elemen muncul saat terlihat, foto bergerak lebih lambat di dalam bingkainya (`data-par`), foto dan daun hero
+ * melayang beda kecepatan (`data-hero`) dan mengikuti kursor, dua pita bersilang, foto signature yang berganti
+ * dengan sapuan, kartu "sepanjang hari" yang bertumpuk, kolom minuman yang bergeser (`data-drift`),
+ * pita foto yang melebar, dan HP peraga alur pesan.
  * Tanpa library: IntersectionObserver + satu requestAnimationFrame per scroll.
  */
 export function LandingMotion() {
@@ -74,7 +52,7 @@ export function LandingMotion() {
       },
       { threshold: 0.15, rootMargin: "0px 0px -5% 0px" }
     );
-    $$(".lp-rv,.ap-room").forEach((el) => io.observe(el));
+    $$(".lp-rv").forEach((el) => io.observe(el));
     cleanups.push(() => io.disconnect());
 
     /* --- elemen yang digerakkan scroll --- */
@@ -82,27 +60,24 @@ export function LandingMotion() {
     const header = $(".lp-hdr");
     const hero = $(".ap-hero");
     const heroEls = $$("[data-hero]");
+    const spins = $$("[data-spin]");
     const ghost = $("[data-heroghost]");
     const ticks = $$("[data-tick]");
+    const pars = $$("[data-par]").map((el) => ({ el, k: Number(el.dataset.par), box: el.parentElement as HTMLElement }));
+    const drifts = $$("[data-drift]").map((el) => ({ el, k: Number(el.dataset.drift), dy: 0 }));
 
     const sig = $(".ap-sig");
     const sigCards = $$(".ap-sig-card");
-    const sigPlates = $$(".ap-plate-slot");
+    const sigShots = $$(".ap-shot");
+    const sigImgs = sigShots.map((sh) => sh.querySelector<HTMLElement>("img"));
     const sigDots = $$(".ap-sig-dots i");
-    const sigParts = sigPlates.map((p) => Array.from(p.querySelectorAll<SVGGElement>(".ap-part")).map((g) => ({ g, at: Number(g.dataset.at) })));
-    const sigItems = sigCards.map((c) => Array.from(c.querySelectorAll<HTMLElement>("li")));
-    const chop = $(".ap-chop");
+    const sigChips = sigCards.map((c) => Array.from(c.querySelectorAll<HTMLElement>(".ap-chips li")));
+    const sigCount = $(".ap-sig-count b");
 
-    const day = $(".ap-day");
-    const moments = $$(".ap-moment");
-    const orb = $(".ap-orb");
-    const arcDone = $<SVGPathElement>(".ap-arc-done");
-    const timeB = $(".ap-time b");
-    const timeS = $(".ap-time span");
-
-    const win = $(".ap-window");
-    const winLayers = $$(".ap-window [data-band]");
-    const winText = $(".ap-window [data-bandin]");
+    const dcards = $$(".ap-dcard");
+    const dinner = dcards.map((c) => c.firstElementChild as HTMLElement | null);
+    const band = $(".ap-band");
+    const bandIn = $(".ap-band-in");
 
     const flow = $(".lp-flow");
     const steps = $$(".lp-steps li:not(.lp-rail)");
@@ -119,8 +94,6 @@ export function LandingMotion() {
     let nopin = false;
     let autoStep = 0;
     let ticking = false;
-    let lastY = window.scrollY;
-    let vel = 0;
 
     /** Seberapa jauh bagian yang "menahan" layar sudah dilewati (0..1) */
     const pinProgress = (el: HTMLElement) => {
@@ -134,15 +107,14 @@ export function LandingMotion() {
       if (!alive) return;
       const y = window.scrollY;
       const on = !reduceMq.matches;
-      vel = lerp(vel, y - lastY, 0.2);
-      lastY = y;
       if (bar) bar.style.transform = `scaleX(${clamp(y / Math.max(1, document.documentElement.scrollHeight - vh))})`;
       header?.classList.toggle("lp-scrolled", y > 8);
       const rs = clamp(vw / 1200, 0.45, 1);
 
-      /* hero: bahan melayang beda kecepatan, tulisan LOCALE bergeser */
+      /* hero: foto dan daun melayang beda kecepatan, mangkuk berputar pelan, tulisan LOCALE bergeser */
       const hy = Math.min(y, hero?.offsetHeight ?? vh);
       for (const el of heroEls) el.style.translate = on ? `0 ${(hy * Number(el.dataset.hero) * rs).toFixed(1)}px` : "";
+      for (const el of spins) el.style.transform = on ? `rotate(${(y * Number(el.dataset.spin)).toFixed(1)}deg)` : "";
       if (ghost) ghost.style.transform = on ? `translate3d(${(-hy * 0.4).toFixed(1)}px,0,0)` : "";
 
       /* dua pita bersilang bergerak berlawanan */
@@ -153,80 +125,70 @@ export function LandingMotion() {
         t.style.transform = `translate3d(${(dir > 0 ? -x : x - loop).toFixed(1)}px,0,0)`;
       }
 
-      /* signature: tiga piring bergantian, isi piring muncul satu per satu */
-      if (sig && sigPlates.length) {
-        const n = sigPlates.length;
-        let idx: number;
-        let q: number;
-        if (nopin) {
-          idx = autoStep % n;
-          q = 1;
-        } else {
-          const p = pinProgress(sig) * n;
-          idx = Math.min(n - 1, Math.floor(p));
-          q = clamp((p - idx) * 1.25);
-        }
-        sigCards.forEach((c, i) => c.classList.toggle("lp-on", i === idx));
-        sigPlates.forEach((pl, i) => {
-          pl.classList.toggle("lp-on", i === idx);
-          pl.classList.toggle("lp-past", i < idx);
-        });
-        sigDots.forEach((d, i) => d.classList.toggle("lp-on", i === idx));
-        sigParts.forEach((parts, i) =>
-          parts.forEach(({ g, at }, j) => {
-            const shown = i < idx || (i === idx && q >= at);
-            g.classList.toggle("lp-on", shown);
-            sigItems[i]?.[j]?.classList.toggle("lp-on", shown);
-          })
-        );
-        if (chop) chop.style.transform = on && !nopin ? `rotate(${lerp(-18, 8, q).toFixed(1)}deg) translateY(${(Math.sin(q * Math.PI) * -14).toFixed(1)}px)` : "";
+      /* foto bergerak lebih lambat di dalam bingkainya */
+      for (const { el, k, box } of pars) {
+        const r = box.getBoundingClientRect();
+        if (r.bottom < -120 || r.top > vh + 120) continue;
+        const t = on ? clamp((r.top + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2), -1, 1) : 0;
+        el.style.transform = `translate3d(0,${(-t * k * r.height).toFixed(1)}px,0)`;
       }
 
-      /* sepanjang hari: jam mengikuti kartu yang sedang di tengah layar */
-      if (day && moments.length) {
-        const mid = vh * 0.55;
-        const pts = moments.map((m) => {
-          const r = m.getBoundingClientRect();
-          return { m, c: r.top + r.height / 2, hour: Number(m.dataset.hour), title: m.dataset.title ?? "" };
-        });
-        let hour = pts[0].hour;
-        let active = 0;
-        if (mid >= pts[pts.length - 1].c) {
-          hour = pts[pts.length - 1].hour + clamp((mid - pts[pts.length - 1].c) / 300) * 2;
-          active = pts.length - 1;
-        } else if (mid > pts[0].c) {
-          for (let i = 1; i < pts.length; i++) {
-            if (mid <= pts[i].c) {
-              const f = clamp((mid - pts[i - 1].c) / Math.max(1, pts[i].c - pts[i - 1].c));
-              hour = lerp(pts[i - 1].hour, pts[i].hour, f);
-              active = f > 0.5 ? i : i - 1;
-              break;
-            }
+      /* elemen yang bergeser relatif terhadap tengah layar */
+      for (const d of drifts) {
+        const r = d.el.getBoundingClientRect();
+        if (r.bottom < -240 || r.top > vh + 240) continue;
+        const t = on ? clamp((r.top - d.dy + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2), -1, 1) : 0;
+        d.dy = t * d.k * rs;
+        d.el.style.translate = `0 ${d.dy.toFixed(1)}px`;
+      }
+
+      /* signature: tiga foto bergantian dengan sapuan dari bawah, bahan muncul satu per satu */
+      if (sig && sigShots.length) {
+        const n = sigShots.length;
+        const p = nopin ? autoStep % n : pinProgress(sig) * n;
+        const idx = Math.min(n - 1, Math.floor(p));
+        const q = nopin ? 1 : clamp((p - idx) * 1.6);
+        /* teks berganti sedikit lebih awal, saat foto berikutnya mulai menyapu */
+        const lead = nopin ? idx : Math.min(n - 1, Math.floor(p + 0.15));
+        sigCards.forEach((c, i) => c.classList.toggle("lp-on", i === lead));
+        sigDots.forEach((d, i) => d.classList.toggle("lp-on", i === lead));
+        if (sigCount) sigCount.textContent = String(lead + 1).padStart(2, "0");
+        sigShots.forEach((sh, i) => {
+          const open = i === 0 ? 1 : nopin ? (i <= idx ? 1 : 0) : smooth(clamp((p - (i - 0.3)) / 0.3));
+          sh.style.clipPath = `inset(${((1 - open) * 100).toFixed(2)}% 0 0 0)`;
+          const img = sigImgs[i];
+          if (img) {
+            const local = clamp(p - i + 0.3, 0, 1.3) / 1.3;
+            img.style.transform = on && !nopin ? `scale(${(1.2 - local * 0.16).toFixed(4)})` : "";
           }
-        }
-        moments.forEach((m, i) => m.classList.toggle("lp-on", i === active));
-        const t = clamp((hour - 6) / 15);
-        day.style.setProperty("--ap-sky", skyAt(hour));
-        day.style.setProperty("--ap-night", clamp((hour - 17.5) / 1.5).toFixed(3));
-        day.classList.toggle("ap-dark", hour > 17.6);
-        orb?.classList.toggle("ap-moon", hour > 18.4);
-        if (orb) {
-          const th = Math.PI * lerp(0.06, 0.94, t);
-          orb.style.left = `${((200 - 180 * Math.cos(th)) / 4).toFixed(2)}%`;
-          orb.style.top = `${((210 - 180 * Math.sin(th)) / 2.3).toFixed(2)}%`;
-        }
-        if (arcDone) arcDone.style.strokeDashoffset = (1 - t).toFixed(3);
-        if (timeB) timeB.textContent = hhmm(hour);
-        if (timeS) timeS.textContent = pts[active].title;
+        });
+        sigChips.forEach((chips, i) =>
+          chips.forEach((li, j) => li.classList.toggle("lp-on", i === lead && (nopin || (i === idx && q >= (j + 0.4) / (chips.length + 1.5)))))
+        );
       }
 
-      /* jendela kota: lapisan jauh bergerak paling lambat */
-      if (win) {
-        const r = win.getBoundingClientRect();
+      /* sepanjang hari: kartu yang tertutup kartu berikutnya mengecil dan meredup */
+      dcards.forEach((c, i) => {
+        const next = dcards[i + 1];
+        const el = dinner[i];
+        if (!el) return;
+        if (!next || !on || nopin) {
+          el.style.transform = "";
+          el.style.filter = "";
+          return;
+        }
+        const r = c.getBoundingClientRect();
+        const cover = clamp(1 - (next.getBoundingClientRect().top - r.top) / Math.max(1, r.height));
+        el.style.transform = `scale(${(1 - cover * 0.06).toFixed(4)})`;
+        el.style.filter = cover > 0.01 ? `brightness(${(1 - cover * 0.2).toFixed(3)})` : "";
+      });
+
+      /* pita foto ruang makan: dari kartu membulat melebar sampai penuh */
+      if (band && bandIn) {
+        const r = band.getBoundingClientRect();
         if (r.bottom > -80 && r.top < vh + 80) {
-          const t = on ? clamp((r.top + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2), -1, 1) : 0;
-          for (const l of winLayers) l.style.transform = `translate3d(0,${(t * r.height * Number(l.dataset.band)).toFixed(1)}px,0)`;
-          if (winText) winText.style.transform = `translate3d(0,${(-t * r.height * 0.08).toFixed(1)}px,0)`;
+          const m = on ? (1 - smooth(clamp((vh - r.top) / (vh * 0.85)))) * 7 : 0;
+          bandIn.style.clipPath = `inset(${(m * 0.6).toFixed(2)}% ${m.toFixed(2)}% round ${(m * 6).toFixed(1)}px)`;
         }
       }
 
@@ -293,77 +255,33 @@ export function LandingMotion() {
       root.classList.remove("lp-nopin");
     });
 
-    /* --- uap hangat yang naik (canvas), hanya digambar saat terlihat --- */
-    const fields = $$<HTMLCanvasElement>("canvas.ap-steamfx").flatMap((cv) => {
-      const ctx = cv.getContext("2d");
-      if (!ctx) return [];
-      const few = cv.dataset.few === "1";
-      let W = 0;
-      let H = 0;
-      let visible = false;
-      let wisps: Wisp[] = [];
-      const make = (fresh: boolean): Wisp => ({
-        x: Math.random() * W,
-        y: fresh ? H + 40 : Math.random() * H,
-        r: 30 + Math.random() * 70,
-        vy: 0.25 + Math.random() * 0.45,
-        sway: Math.random() * 6.28,
-        o: 0.05 + Math.random() * 0.08,
-        life: 0,
-      });
-      const size = () => {
-        const r = cv.getBoundingClientRect();
-        const d = Math.min(window.devicePixelRatio || 1, 1.5);
-        W = r.width;
-        H = r.height;
-        cv.width = Math.round(W * d);
-        cv.height = Math.round(H * d);
-        ctx.setTransform(d, 0, 0, d, 0, 0);
-        const n = Math.round((few ? 8 : 14) * Math.min(1, W / 900 + 0.4));
-        while (wisps.length < n) wisps.push(make(false));
-        wisps = wisps.slice(0, n);
+    /* --- hero mengikuti kursor (hanya perangkat dengan mouse) --- */
+    if (hero && matchMedia("(hover:hover) and (pointer:fine)").matches) {
+      let tx = 0;
+      let ty = 0;
+      let cx = 0;
+      let cy = 0;
+      let raf = 0;
+      const tick = () => {
+        cx = lerp(cx, tx, 0.08);
+        cy = lerp(cy, ty, 0.08);
+        hero.style.setProperty("--mx", cx.toFixed(3));
+        hero.style.setProperty("--my", cy.toFixed(3));
+        raf = Math.abs(cx - tx) + Math.abs(cy - ty) > 0.002 ? requestAnimationFrame(tick) : 0;
       };
-      const so = new ResizeObserver(size);
-      so.observe(cv);
-      const vis = new IntersectionObserver((e) => (visible = e[0].isIntersecting));
-      vis.observe(cv);
+      const onMove = (e: PointerEvent) => {
+        if (reduceMq.matches) return;
+        const r = hero.getBoundingClientRect();
+        tx = (e.clientX - r.left) / r.width - 0.5;
+        ty = (e.clientY - r.top) / r.height - 0.5;
+        if (!raf) raf = requestAnimationFrame(tick);
+      };
+      hero.addEventListener("pointermove", onMove);
       cleanups.push(() => {
-        so.disconnect();
-        vis.disconnect();
+        hero.removeEventListener("pointermove", onMove);
+        cancelAnimationFrame(raf);
       });
-      size();
-      const tint = getComputedStyle(cv).color || "rgb(255,255,255)";
-      const rgb = tint.match(/\d+/g)?.slice(0, 3).join(",") ?? "255,255,255";
-      return [
-        () => {
-          if (!visible || reduceMq.matches) return;
-          ctx.clearRect(0, 0, W, H);
-          for (const w of wisps) {
-            w.y -= w.vy + Math.abs(vel) * 0.03;
-            w.sway += 0.01;
-            w.x += Math.sin(w.sway) * 0.4;
-            w.life = clamp(w.life + 0.01);
-            if (w.y < -w.r * 2) Object.assign(w, make(true));
-            const fade = w.life * clamp(w.y / (H * 0.6));
-            const g = ctx.createRadialGradient(w.x, w.y, 0, w.x, w.y, w.r);
-            g.addColorStop(0, `rgba(${rgb},${(w.o * fade).toFixed(3)})`);
-            g.addColorStop(1, `rgba(${rgb},0)`);
-            ctx.fillStyle = g;
-            ctx.beginPath();
-            ctx.arc(w.x, w.y, w.r, 0, Math.PI * 2);
-            ctx.fill();
-          }
-        },
-      ];
-    });
-    let raf = 0;
-    const loop = () => {
-      vel *= 0.92;
-      if (!document.hidden) fields.forEach((draw) => draw());
-      raf = requestAnimationFrame(loop);
-    };
-    if (fields.length) raf = requestAnimationFrame(loop);
-    cleanups.push(() => cancelAnimationFrame(raf));
+    }
 
     return () => {
       alive = false;

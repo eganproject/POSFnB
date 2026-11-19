@@ -28,7 +28,7 @@ export default async function LoginPage({ searchParams }: { searchParams: Promis
     <div className="grid min-h-dvh lg:grid-cols-[1.1fr_1fr]">
       <aside className="relative hidden overflow-hidden bg-olive p-12 text-cream lg:flex lg:flex-col lg:justify-between">
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={BRAND_PHOTOS.interior[0]} alt="" className="absolute inset-0 size-full object-cover opacity-25" />
+        <img src={BRAND_PHOTOS.interior[0]} alt="" className="absolute inset-0 size-full object-cover opacity-40" />
         <div className="absolute inset-0 bg-gradient-to-t from-olive-deep via-olive-deep/70 to-olive/60" />
         <div className="relative flex items-center gap-3">
           <BrandMark className="size-10" />
