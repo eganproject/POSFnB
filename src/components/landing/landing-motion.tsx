@@ -3,14 +3,18 @@ import { useEffect } from "react";
 
 const clamp = (v: number, a = 0, b = 1) => Math.min(b, Math.max(a, v));
 const lerp = (a: number, b: number, t: number) => a + (b - a) * t;
-const mix = (c1: number[], c2: number[], t: number) => `rgb(${c1.map((v, i) => Math.round(lerp(v, c2[i], t))).join(",")})`;
+const hhmm = (hour: number) => {
+  const m = Math.round((hour * 60) / 10) * 10;
+  return `${String(Math.floor(m / 60) % 24).padStart(2, "0")}.${String(m % 60).padStart(2, "0")}`;
+};
 
 type Bean = { x: number; y: number; r: number; a: number; va: number; vy: number; sway: number; o: number };
 
 /**
- * Mesin animasi landing page: elemen muncul saat terlihat, parallax, cangkir terisi,
- * HP peraga alur pesan, biji kopi berjatuhan. Tidak merender apa pun; ia hanya
- * menggerakkan elemen di dalam `.lp` lewat atribut `data-*`.
+ * Mesin animasi landing page: elemen muncul saat terlihat, parallax berlapis, benang emas
+ * yang menyambungkan semua bagian, kartu yang bergeser ke samping dengan jam berjalan, kaleng kopi
+ * yang berganti, HP peraga alur pesan, dan biji kopi berjatuhan.
+ * Tidak merender apa pun; ia hanya menggerakkan elemen di dalam `.lp`.
  * Tanpa library: IntersectionObserver + satu requestAnimationFrame per scroll.
  */
 export function LandingMotion() {
@@ -20,12 +24,8 @@ export function LandingMotion() {
     const $ = <T extends Element = HTMLElement>(s: string) => root.querySelector<T>(s);
     const $$ = <T extends Element = HTMLElement>(s: string) => Array.from(root.querySelectorAll<T>(s));
     const reduceMq = matchMedia("(prefers-reduced-motion: reduce)");
-    const flatMq = matchMedia("(max-height: 520px)"); // layar pendek: tanpa bagian yang "menahan"
     const cleanups: (() => void)[] = [];
     let alive = true;
-
-    root.classList.add("lp-js");
-    cleanups.push(() => root.classList.remove("lp-js"));
 
     /* --- angka menghitung naik --- */
     const tween = (ms: number, fn: (e: number) => void) => {
@@ -42,11 +42,11 @@ export function LandingMotion() {
     const countUp = (el: HTMLElement) => {
       const final = el.textContent ?? "";
       const to = Number(el.dataset.count);
-      const dec = Number(el.dataset.dec || 0);
-      const prefix = el.dataset.prefix ?? "";
       if (!Number.isFinite(to)) return;
-      const fmt = new Intl.NumberFormat("id-ID", { minimumFractionDigits: dec, maximumFractionDigits: dec });
+      const dec = Number(el.dataset.dec || 0);
       const stepSize = Number(el.dataset.step || 0);
+      const prefix = el.dataset.prefix ?? "";
+      const fmt = new Intl.NumberFormat("id-ID", { minimumFractionDigits: dec, maximumFractionDigits: dec });
       tween(Number(el.dataset.ms || 1500), (e) => {
         if (e >= 1) return void (el.textContent = final);
         const v = to * e;
@@ -66,9 +66,9 @@ export function LandingMotion() {
           el.querySelectorAll<HTMLElement>("[data-count]").forEach(countUp);
         }
       },
-      { threshold: 0.15, rootMargin: "0px 0px -6% 0px" }
+      { threshold: 0.15, rootMargin: "0px 0px -5% 0px" }
     );
-    $$("[data-io]").forEach((el) => io.observe(el));
+    $$(".lp-rv,.lp-io").forEach((el) => io.observe(el));
     cleanups.push(() => io.disconnect());
 
     /* --- foto miring mengikuti kursor (hanya perangkat dengan mouse) --- */
@@ -92,20 +92,49 @@ export function LandingMotion() {
 
     /* --- elemen yang digerakkan scroll --- */
     const bar = $(".lp-progress");
-    const header = $(".lp-header");
-    const plx = $$("[data-plx]");
-    const inner = $$("[data-plx-inner]");
-    const bands = $$("[data-band],[data-band-x]");
-    const ribbon = $(".lp-ribbon-track");
-    const brew = $(".lp-brew");
-    const caps = $$(".lp-cap");
-    const dots = $$(".lp-dots i");
-    const liquid = $<SVGGElement>("[data-cup=liquid]");
-    const wave = $<SVGPathElement>("[data-cup=wave]");
-    const foam = $<SVGElement>("[data-cup=foam]");
-    const art = $<SVGElement>("[data-cup=art]");
-    const stream = $<SVGRectElement>("[data-cup=stream]");
-    const steam = $<SVGGElement>("[data-cup=steam]");
+    const header = $(".lp-hdr");
+    const hero = $(".lp-hero");
+    const heroEls = $$("[data-hero]");
+    const heroGhost = $("[data-heroghost]");
+    const inner = $$("[data-inner]");
+    const bands = $$(".lp-band").map((b) => ({
+      b,
+      bg: b.querySelector<HTMLElement>("[data-band]"),
+      ghost: b.querySelector<HTMLElement>("[data-bandx]"),
+      text: b.querySelector<HTMLElement>("[data-bandin]"),
+    }));
+    const layers = $$("[data-plx]").map((el) => ({ el, s: Number(el.dataset.plx), top: 0, h: 0 }));
+    const ribbon = $(".lp-rtrack");
+    const java = $(".lp-java");
+    const caps = $$(".lp-java .lp-cap");
+    const pairs = $$(".lp-java .lp-pair");
+    const dots = $$(".lp-java .lp-dots i");
+    const origins = $$(".lp-origins span");
+    const orbit = $(".lp-orbit");
+    const day = $(".lp-day");
+    const track = $(".lp-day .lp-track");
+    const view = $(".lp-day .lp-view");
+    const hbar = $(".lp-hbar i");
+    const sky = $(".lp-sky i");
+    const clockText = $(".lp-clock b");
+    const panels = $$(".lp-panel:not(.lp-end)").map((p) => ({
+      p,
+      img: p.querySelector<HTMLElement>("img"),
+      num: p.querySelector<HTMLElement>(".lp-num"),
+    }));
+    /* jam berjalan: tiap kartu punya jamnya, di antaranya dihitung rata */
+    const hourStops = $$(".lp-panel[data-hour]").map((el) => ({ el, hour: Number(el.dataset.hour), at: 0 }));
+    const main = $(".lp-main");
+    const thread = $<SVGSVGElement>(".lp-thread");
+    const tBase = $<SVGPathElement>(".lp-tbase");
+    const tLine = $<SVGPathElement>(".lp-tline");
+    const tNodes = $<SVGGElement>(".lp-thread g");
+    const tTip = $<SVGCircleElement>(".lp-ttip");
+    const nodeSecs = $$("[data-node]");
+    /* benang emas: titik (x, y, panjang kumulatif) dari atas sampai bawah halaman */
+    let tPts: { x: number; y: number; l: number }[] = [];
+    let tNodeEls: { el: SVGCircleElement; y: number }[] = [];
+    let mainTop = 0;
     const flow = $(".lp-flow");
     const steps = $$(".lp-steps li:not(.lp-rail)");
     const rail = $(".lp-rail i");
@@ -115,83 +144,113 @@ export function LandingMotion() {
     const navLinks = $$<HTMLAnchorElement>(".lp-nav a");
     const navTargets = navLinks.map((a) => document.getElementById(a.getAttribute("href")?.slice(1) ?? ""));
 
-    let vh = window.innerHeight;
     let vw = window.innerWidth;
+    let vh = window.innerHeight;
+    let hh = 60;
+    let nopin = false;
+    let maxX = 0;
     let lastY = window.scrollY;
     let vel = 0;
     let autoStep = 0;
     let ticking = false;
+
+    /** Seberapa jauh sebuah bagian yang "menahan" layar sudah dilewati (0..1) */
     const pinProgress = (el: HTMLElement) => {
       const r = el.getBoundingClientRect();
-      return clamp(-r.top / Math.max(1, r.height - vh));
+      const pin = el.firstElementChild as HTMLElement | null;
+      return clamp((hh - r.top) / Math.max(1, r.height - (pin?.offsetHeight ?? vh)));
     };
 
     const frame = () => {
       ticking = false;
       if (!alive) return;
       const y = window.scrollY;
-      const reduce = reduceMq.matches;
-      const flat = flatMq.matches;
+      const on = !reduceMq.matches;
       vel = lerp(vel, y - lastY, 0.2);
       lastY = y;
       if (bar) bar.style.transform = `scaleX(${clamp(y / Math.max(1, document.documentElement.scrollHeight - vh))})`;
       header?.classList.toggle("lp-scrolled", y > 8);
 
-      /* parallax: kekuatan mengecil di layar sempit agar tidak bertabrakan */
-      const k = reduce ? 0 : clamp(vw / 1280, 0.45, 1);
-      for (const el of plx) {
-        const r = (el.parentElement ?? el).getBoundingClientRect();
-        if (r.bottom < -200 || r.top > vh + 200) continue;
-        const t = (r.top + r.height / 2 - vh / 2) / vh;
-        el.style.transform = k ? `translate3d(0,${(t * Number(el.dataset.plx) * k).toFixed(1)}px,0)` : "";
+      /* skala gerak mengikuti ukuran layar: HP bergerak lebih sedikit dari desktop */
+      const rs = clamp(vw / 1200, 0.42, 1);
+      const unit = clamp(vh * 0.16, 60, 150) * rs;
+
+      /* hero: lapisan foto + tulisan besar di belakang */
+      const hy = Math.min(y, hero?.offsetHeight ?? vh);
+      for (const el of heroEls) el.style.transform = on ? `translate3d(0,${(hy * Number(el.dataset.hero) * rs).toFixed(1)}px,0)` : "";
+      if (heroGhost) heroGhost.style.transform = on ? `translate3d(${(-hy * 0.35).toFixed(1)}px,0,0)` : "";
+
+      /* foto bertumpuk: posisi rancangan tepat saat berada di tengah layar */
+      for (const o of layers) {
+        const c = o.top + o.h / 2 - y - vh / 2;
+        if (Math.abs(c) > vh) continue;
+        o.el.style.transform = on ? `translate3d(0,${((c / vh) * o.s * unit).toFixed(1)}px,0)` : "";
       }
+      /* foto bergeser di dalam bingkainya */
       for (const el of inner) {
         const r = (el.parentElement ?? el).getBoundingClientRect();
         if (r.bottom < -60 || r.top > vh + 60) continue;
-        const t = (r.top + r.height / 2 - vh / 2) / vh;
-        el.style.transform = k ? `translate3d(0,${(-t * Number(el.dataset.plxInner) * k).toFixed(1)}px,0)` : "";
+        const t = clamp((r.top + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2), -1, 1);
+        el.style.transform = on ? `translate3d(0,${(-t * r.height * 0.1).toFixed(1)}px,0)` : "";
       }
-      for (const el of bands) {
-        const r = (el.parentElement ?? el).getBoundingClientRect();
+      /* jendela parallax: foto lebih lambat dari tulisan */
+      for (const { b, bg, ghost, text } of bands) {
+        const r = b.getBoundingClientRect();
         if (r.bottom < -80 || r.top > vh + 80) continue;
-        const t = (r.top + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2);
-        const kb = reduce ? 0 : clamp(vw / 1100, 0.55, 1);
-        el.style.transform = el.dataset.bandX
-          ? `translate3d(${(t * kb * Number(el.dataset.bandX)).toFixed(1)}px,0,0)`
-          : `translate3d(0,${(-t * kb * Number(el.dataset.band)).toFixed(1)}px,0)`;
+        const t = on ? clamp((r.top + r.height / 2 - vh / 2) / (vh / 2 + r.height / 2), -1, 1) : 0;
+        if (bg) bg.style.transform = `translate3d(0,${(-t * r.height * 0.17).toFixed(1)}px,0)`;
+        if (text) text.style.transform = `translate3d(0,${(t * r.height * 0.1).toFixed(1)}px,0)`;
+        if (ghost) ghost.style.transform = `translate3d(calc(-50% + ${(t * Number(ghost.dataset.bandx) * vw * 0.22).toFixed(1)}px),0,0)`;
       }
       if (ribbon) {
         const loop = ribbon.scrollWidth / 4 || 1;
-        ribbon.style.transform = `translate3d(${-((y * 0.45) % loop).toFixed(1)}px,0,0)`;
+        ribbon.style.transform = `translate3d(${(-((y * 0.45) % loop)).toFixed(1)}px,0,0)`;
       }
 
-      /* cangkir terisi */
-      if (brew && liquid && wave && stream) {
-        const p = flat ? 1 : pinProgress(brew);
-        const fill = clamp((p - 0.04) / 0.8);
-        const level = lerp(262, 104, fill);
-        liquid.setAttribute("transform", `translate(0,${level.toFixed(1)})`);
-        wave.setAttribute("fill", mix([59, 36, 22], [176, 124, 78], clamp((fill - 0.4) / 0.45)));
-        stream.setAttribute("opacity", fill > 0.01 && fill < 0.97 ? "1" : "0");
-        stream.setAttribute("fill", fill < 0.4 ? "#3b2416" : "#f3e7c9");
-        stream.setAttribute("height", String(level + 46));
-        const done = String(clamp((p - 0.86) / 0.08));
-        foam?.setAttribute("opacity", done);
-        art?.setAttribute("opacity", done);
-        steam?.setAttribute("opacity", done);
-        const ci = p < 0.36 ? 0 : p < 0.8 ? 1 : 2;
-        caps.forEach((c, i) => c.classList.toggle("lp-on", i === ci));
-        dots.forEach((d, i) =>
-          d.style.setProperty("--f", String(clamp(i === 0 ? p / 0.36 : i === 1 ? (p - 0.36) / 0.44 : (p - 0.8) / 0.2)))
-        );
+      /* Java Series: tiga pasang kaleng berganti, cincin titik berputar */
+      if (java) {
+        const p = nopin ? 0 : pinProgress(java);
+        const ci = nopin ? autoStep % 3 : p < 0.34 ? 0 : p < 0.7 ? 1 : 2;
+        if (!nopin) caps.forEach((c, i) => c.classList.toggle("lp-on", i === ci));
+        pairs.forEach((c, i) => c.classList.toggle("lp-on", i === ci));
+        dots.forEach((d, i) => d.style.setProperty("--lp-f", String(clamp(i === 0 ? p / 0.34 : i === 1 ? (p - 0.34) / 0.36 : (p - 0.7) / 0.3))));
+        origins.forEach((o, i) => o.classList.toggle("lp-on", Math.floor(i / 2) === ci));
+        if (orbit) orbit.style.transform = on ? `rotate(${(p * 150).toFixed(1)}deg)` : "";
+      }
+
+      /* sehari di Agreya: scroll ke bawah, kartu bergeser ke samping, jam berjalan, siang menjadi malam */
+      if (day && track) {
+        if (nopin) track.style.transform = "";
+        else {
+          const dp = clamp((pinProgress(day) - 0.04) / 0.84);
+          track.style.transform = `translate3d(${(-dp * maxX).toFixed(1)}px,0,0)`;
+          hbar?.style.setProperty("--lp-f", String(dp));
+          let hour = hourStops[0]?.hour ?? 6;
+          for (let i = 1; i < hourStops.length; i++) {
+            const a = hourStops[i - 1];
+            const b = hourStops[i];
+            if (dp >= a.at) hour = lerp(a.hour, b.hour, clamp((dp - a.at) / Math.max(0.0001, b.at - a.at)));
+          }
+          if (clockText) clockText.textContent = hhmm(hour);
+          sky?.style.setProperty("--lp-f", ((hour - 6) / 12).toFixed(3));
+          day.style.setProperty("--lp-n", clamp((hour - 16.5) / 3).toFixed(3));
+        }
+        for (const { p, img, num } of panels) {
+          const r = p.getBoundingClientRect();
+          if (r.right < -80 || r.left > vw + 80) continue;
+          const t = on ? clamp((r.left + r.width / 2 - vw / 2) / (vw / 2 + r.width / 2), -1, 1) : 0;
+          if (img) img.style.transform = `translate3d(${(-t * r.width * 0.1).toFixed(1)}px,0,0)`;
+          if (num) num.style.transform = `translate3d(${(t * r.width * 0.16).toFixed(1)}px,0,0)`;
+        }
       }
 
       /* HP memperagakan alur pesan */
       if (flow && screens.length) {
-        const q = flat ? (autoStep + 0.5) / screens.length : pinProgress(flow);
-        const si = Math.min(screens.length - 1, Math.floor(q * screens.length));
+        const n = screens.length;
+        const q = nopin ? 0 : pinProgress(flow);
+        const si = nopin ? autoStep % n : Math.min(n - 1, Math.floor(q * n));
         steps.forEach((s, i) => s.classList.toggle("lp-on", i === si));
-        rail?.style.setProperty("--f", String(clamp((q * screens.length) / (screens.length - 1))));
+        rail?.style.setProperty("--lp-f", String(nopin ? si / (n - 1) : clamp((q * n) / (n - 1))));
         screens.forEach((s, i) => {
           s.classList.toggle("lp-on", i === si);
           s.classList.toggle("lp-past", i < si);
@@ -199,7 +258,29 @@ export function LandingMotion() {
         bubbles.forEach((b) => b.classList.toggle("lp-on", Number(b.dataset.at) === si));
         if (phone)
           phone.style.transform =
-            reduce || flat ? "" : `rotate(${lerp(-3, 3, q).toFixed(2)}deg) translateY(${(Math.sin(q * Math.PI * 4) * 6).toFixed(1)}px)`;
+            !on || nopin ? "" : `rotate(${lerp(-3, 3, q).toFixed(2)}deg) translateY(${(Math.sin(q * Math.PI * 4) * 6).toFixed(1)}px)`;
+      }
+
+      /* benang emas: tumbuh sampai sedikit di bawah tengah layar */
+      if (tLine && tPts.length > 1) {
+        const last = tPts[tPts.length - 1];
+        const ty = clamp(y + vh * 0.62 - mainTop, tPts[0].y, last.y);
+        let lo = 0;
+        let hi = tPts.length - 1;
+        while (hi - lo > 1) {
+          const mid = (lo + hi) >> 1;
+          if (tPts[mid].y <= ty) lo = mid;
+          else hi = mid;
+        }
+        const a = tPts[lo];
+        const b = tPts[hi];
+        const f = clamp((ty - a.y) / Math.max(1, b.y - a.y));
+        tLine.style.strokeDashoffset = (last.l - lerp(a.l, b.l, f)).toFixed(1);
+        if (tTip) {
+          tTip.setAttribute("cx", lerp(a.x, b.x, f).toFixed(1));
+          tTip.setAttribute("cy", ty.toFixed(1));
+        }
+        for (const n of tNodeEls) n.el.classList.toggle("lp-on", n.y <= ty);
       }
 
       /* menu navigasi yang sedang aktif */
@@ -214,26 +295,102 @@ export function LandingMotion() {
       ticking = true;
       requestAnimationFrame(frame);
     };
-    const onResize = () => {
+
+    /** Susun ulang jalur benang emas: garis berkelok pelan di tepi kiri, dengan satu titik di awal tiap bagian */
+    const buildThread = () => {
+      if (!main || !thread || !tBase || !tLine || !tNodes) return;
+      tPts = [];
+      tNodeEls = [];
+      tNodes.replaceChildren();
+      if (nopin || !hero) return;
+      const box = main.getBoundingClientRect();
+      mainTop = box.top + window.scrollY;
+      const gut = parseFloat(getComputedStyle(root).getPropertyValue("--lp-gut")) || 16;
+      const edge = Math.max(0, (vw - 1200) / 2);
+      const amp = clamp(edge * 0.4 + gut * 0.22, 3, 22);
+      const x0 = edge + gut * 0.5 + (edge > 40 ? -amp : 0);
+      const y0 = hero.offsetTop + hero.offsetHeight - 96;
+      const y1 = box.height - 28;
+      const wave = (yy: number) => x0 + Math.sin((yy - y0) / 190) * amp * clamp((yy - y0) / 240);
+      let d = "";
+      let len = 0;
+      for (let yy = y0; ; yy = Math.min(y1, yy + 22)) {
+        const x = wave(yy);
+        const prev = tPts[tPts.length - 1];
+        if (prev) len += Math.hypot(x - prev.x, yy - prev.y);
+        tPts.push({ x, y: yy, l: len });
+        d += `${prev ? "L" : "M"}${x.toFixed(1)} ${yy.toFixed(1)}`;
+        if (yy >= y1) break;
+      }
+      tBase.setAttribute("d", d);
+      tLine.setAttribute("d", d);
+      tLine.style.strokeDasharray = `${len.toFixed(1)} ${len.toFixed(1)}`;
+      for (const sec of nodeSecs) {
+        const ny = sec.getBoundingClientRect().top - box.top + 34;
+        if (ny < y0 || ny > y1) continue;
+        const c = document.createElementNS("http://www.w3.org/2000/svg", "circle");
+        c.setAttribute("class", "lp-tnode");
+        c.setAttribute("cx", wave(ny).toFixed(1));
+        c.setAttribute("cy", ny.toFixed(1));
+        c.setAttribute("r", "5");
+        tNodes.appendChild(c);
+        tNodeEls.push({ el: c, y: ny });
+      }
+    };
+
+    /** Ukur ulang tiap ukuran layar berubah (putar HP, ubah jendela, font selesai dimuat) */
+    const measure = () => {
+      if (!alive) return;
+      vw = document.documentElement.clientWidth;
       vh = window.innerHeight;
-      vw = window.innerWidth;
+      hh = header?.offsetHeight ?? 60;
+      // layar sangat pendek (HP mendatar) atau gerak dikurangi: tanpa bagian yang "menahan" layar
+      nopin = reduceMq.matches || vh < 440;
+      root.classList.toggle("lp-nopin", nopin);
+      for (const o of layers) o.el.style.transform = "";
+      for (const o of layers) {
+        const r = o.el.getBoundingClientRect();
+        o.top = r.top + window.scrollY;
+        o.h = r.height;
+      }
+      maxX = track && view ? Math.max(0, track.scrollWidth - view.clientWidth) : 0;
+      if (track) {
+        const pad = parseFloat(getComputedStyle(track).paddingLeft) || 0;
+        for (const s of hourStops) s.at = maxX ? clamp((s.el.offsetLeft - pad) / maxX) : 0;
+      }
+      buildThread();
+      frame();
+    };
+    let resizeTimer = 0;
+    const onResize = () => {
+      window.clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(measure, 80);
       request();
     };
     window.addEventListener("scroll", request, { passive: true });
     window.addEventListener("resize", onResize);
-    flatMq.addEventListener("change", request);
-    // di layar pendek tidak ada scroll yang menggerakkan HP, jadi layarnya berganti sendiri
+    window.addEventListener("load", measure);
+    reduceMq.addEventListener("change", measure);
+    document.fonts?.ready.then(measure).catch(() => {});
+    // foto yang baru selesai dimuat bisa menggeser tata letak
+    const ro = new ResizeObserver(onResize);
+    ro.observe(root);
+    // tanpa "menahan" layar tidak ada scroll yang menggerakkan HP, jadi layarnya berganti sendiri
     const auto = window.setInterval(() => {
-      if (!flatMq.matches) return;
-      autoStep = (autoStep + 1) % 4;
+      if (!nopin) return;
+      autoStep += 1;
       request();
     }, 3200);
-    frame();
+    measure();
     cleanups.push(() => {
       window.removeEventListener("scroll", request);
       window.removeEventListener("resize", onResize);
-      flatMq.removeEventListener("change", request);
+      window.removeEventListener("load", measure);
+      reduceMq.removeEventListener("change", measure);
+      ro.disconnect();
       window.clearInterval(auto);
+      window.clearTimeout(resizeTimer);
+      root.classList.remove("lp-nopin");
     });
 
     /* --- biji kopi berjatuhan (canvas), hanya digambar saat terlihat --- */
@@ -253,7 +410,7 @@ export function LandingMotion() {
         va: (Math.random() - 0.5) * 0.012,
         vy: 0.18 + Math.random() * 0.4,
         sway: Math.random() * 6.28,
-        o: 0.08 + Math.random() * 0.14,
+        o: 0.07 + Math.random() * 0.12,
       });
       const size = () => {
         const r = cv.getBoundingClientRect();
@@ -263,16 +420,16 @@ export function LandingMotion() {
         cv.width = Math.round(W * d);
         cv.height = Math.round(H * d);
         ctx.setTransform(d, 0, 0, d, 0, 0);
-        const n = Math.round((few ? 7 : 16) * Math.min(1, W / 900 + 0.3));
+        const n = Math.round((few ? 7 : 16) * Math.min(1, W / 900 + 0.35));
         while (beans.length < n) beans.push(make(false));
         beans = beans.slice(0, n);
       };
-      const ro = new ResizeObserver(size);
-      ro.observe(cv);
+      const sizeObserver = new ResizeObserver(size);
+      sizeObserver.observe(cv);
       const vis = new IntersectionObserver((e) => (visible = e[0].isIntersecting));
       vis.observe(cv);
       cleanups.push(() => {
-        ro.disconnect();
+        sizeObserver.disconnect();
         vis.disconnect();
       });
       size();
@@ -289,11 +446,11 @@ export function LandingMotion() {
             ctx.save();
             ctx.translate(b.x, b.y);
             ctx.rotate(b.a);
-            ctx.fillStyle = `rgba(243,231,201,${b.o})`;
+            ctx.fillStyle = `rgba(238,240,231,${b.o})`;
             ctx.beginPath();
             ctx.ellipse(0, 0, b.r * 0.68, b.r, 0, 0, Math.PI * 2);
             ctx.fill();
-            ctx.strokeStyle = "rgba(74,77,56,.55)";
+            ctx.strokeStyle = "rgba(0,66,49,.6)";
             ctx.lineWidth = Math.max(1, b.r * 0.12);
             ctx.lineCap = "round";
             ctx.beginPath();

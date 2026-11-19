@@ -1,5 +1,5 @@
 // Service worker sederhana: aset statis di-cache, halaman selalu dari network (data harus realtime).
-const CACHE = "warmhour-v1";
+const CACHE = "agreya-v1";
 const OFFLINE = "/offline.html";
 
 self.addEventListener("install", (e) => {

@@ -4,35 +4,35 @@
 
 :root {
   --radius: 0.9rem;
-  /* Warm Hour: hijau zaitun papan menu + krem logo */
-  --background: oklch(0.975 0.014 90);
-  --foreground: oklch(0.27 0.02 110);
-  --card: oklch(0.995 0.006 90);
-  --card-foreground: oklch(0.27 0.02 110);
-  --popover: oklch(0.995 0.006 90);
-  --popover-foreground: oklch(0.27 0.02 110);
-  --primary: oklch(0.47 0.045 113);
-  --primary-foreground: oklch(0.96 0.035 92);
-  --secondary: oklch(0.94 0.03 92);
-  --secondary-foreground: oklch(0.35 0.035 113);
-  --muted: oklch(0.955 0.018 92);
-  --muted-foreground: oklch(0.5 0.025 105);
-  --accent: oklch(0.93 0.045 92);
-  --accent-foreground: oklch(0.36 0.04 113);
+  /* Agreya: hijau tua logo (#004231), krem sage buku menu (#E3E5DA), emas stempel (#E6B350) */
+  --background: oklch(0.955 0.012 115);
+  --foreground: oklch(0.24 0.04 169);
+  --card: oklch(0.992 0.005 115);
+  --card-foreground: oklch(0.24 0.04 169);
+  --popover: oklch(0.992 0.005 115);
+  --popover-foreground: oklch(0.24 0.04 169);
+  --primary: oklch(0.337 0.067 169);
+  --primary-foreground: oklch(0.97 0.012 115);
+  --secondary: oklch(0.917 0.015 115);
+  --secondary-foreground: oklch(0.3 0.06 169);
+  --muted: oklch(0.935 0.013 115);
+  --muted-foreground: oklch(0.47 0.03 165);
+  --accent: oklch(0.925 0.05 88);
+  --accent-foreground: oklch(0.3 0.06 169);
   --destructive: oklch(0.56 0.19 27);
   --success: oklch(0.58 0.12 150);
   --warning: oklch(0.78 0.13 80);
   --info: oklch(0.58 0.11 245);
-  --border: oklch(0.9 0.025 92);
-  --input: oklch(0.87 0.028 92);
-  --ring: oklch(0.47 0.045 113);
-  --sidebar: oklch(0.3 0.03 113);
-  --sidebar-foreground: oklch(0.94 0.035 92);
-  /* Warna khas brand di luar token shadcn */
-  --olive: oklch(0.51 0.042 113);
-  --olive-deep: oklch(0.4 0.038 113);
-  --cream: oklch(0.93 0.045 92);
-  --honey: oklch(0.68 0.115 75);
+  --border: oklch(0.88 0.018 115);
+  --input: oklch(0.855 0.02 115);
+  --ring: oklch(0.337 0.067 169);
+  --sidebar: oklch(0.243 0.047 171);
+  --sidebar-foreground: oklch(0.95 0.015 115);
+  /* Warna khas brand di luar token shadcn (nama token dipertahankan dari tema sebelumnya) */
+  --olive: oklch(0.337 0.067 169);
+  --olive-deep: oklch(0.27 0.055 170);
+  --cream: oklch(0.945 0.016 115);
+  --honey: oklch(0.795 0.129 81.5);
 }
 
 .dark {
@@ -90,8 +90,8 @@
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
   --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-poiret), "Didot", "Bodoni 72", Georgia, serif;
-  --font-serif: var(--font-cormorant), "Times New Roman", Georgia, serif;
+  --font-display: var(--font-sora), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-serif: var(--font-sora), var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
   --animate-pop: pop 0.35s cubic-bezier(0.2, 0.9, 0.3, 1.3);
   --animate-fade-up: fade-up 0.35s ease-out both;
   --animate-pulse-ring: pulse-ring 1.6s ease-out infinite;
@@ -159,6 +159,9 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .pb-safe { padding-bottom: max(env(safe-area-inset-bottom), 0.75rem); }
   .tabular { font-variant-numeric: tabular-nums; }
+  /* Judul memakai Sora: lebih tebal dan rapat daripada huruf tema sebelumnya */
+  .font-display, .font-serif { font-weight: 600; letter-spacing: -0.015em; }
+  .font-serif.italic { font-style: normal; font-weight: 500; }
   /* Anak-anak elemen muncul berurutan (maks. ~12 pertama diberi jeda) */
   .stagger > * { animation: fade-up 0.35s ease-out backwards; animation-delay: 420ms; }
   .stagger > :nth-child(2) { animation-delay: 35ms; }

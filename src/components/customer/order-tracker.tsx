@@ -461,7 +461,7 @@ function heroFor(order: TrackerOrder, needsOnlinePay: boolean) {
       };
     }
     case "COMPLETED":
-      return { bg: "bg-gradient-to-br from-[oklch(0.5_0.1_150)] to-[oklch(0.6_0.11_145)]", icon: PartyPopper, title: "Selamat menikmati!", desc: "Terima kasih sudah mampir. Sampai jumpa di warm hour berikutnya." };
+      return { bg: "bg-gradient-to-br from-[oklch(0.5_0.1_150)] to-[oklch(0.6_0.11_145)]", icon: PartyPopper, title: "Selamat menikmati!", desc: "Terima kasih sudah mampir. Sampai jumpa lagi di Agreya." };
     case "CANCELLED":
       return { bg: "bg-gradient-to-br from-zinc-600 to-zinc-500", icon: XCircle, title: "Pesanan dibatalkan", desc: order.cancelReason || "Hubungi staf jika ada pertanyaan." };
   }
