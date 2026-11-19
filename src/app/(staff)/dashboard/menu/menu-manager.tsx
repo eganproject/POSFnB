@@ -47,8 +47,8 @@ export function MenuManager({ categories, selected }: { categories: Cat[]; selec
     });
 
   return (
-    <div className="grid gap-6 lg:grid-cols-[260px_1fr]">
-      <aside className="space-y-2">
+    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[260px_minmax(0,1fr)]">
+      <aside className="min-w-0 space-y-2">
         <div className="flex items-center justify-between px-1">
           <p className="text-sm font-semibold text-muted-foreground">Kategori</p>
           <Button
@@ -62,13 +62,13 @@ export function MenuManager({ categories, selected }: { categories: Cat[]; selec
             <Plus /> Baru
           </Button>
         </div>
-        <nav className="space-y-1 rounded-2xl border bg-card p-2">
-          <Link href="/dashboard/menu" className={cn("flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium transition", selected === "all" ? "bg-primary/10 text-primary" : "hover:bg-muted")}>
+        <nav className="flex gap-1 overflow-x-auto rounded-2xl border bg-card p-2 lg:block lg:space-y-1 lg:overflow-visible">
+          <Link href="/dashboard/menu" className={cn("flex shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-medium transition", selected === "all" ? "bg-primary/10 text-primary" : "hover:bg-muted")}>
             <span>✨</span> <span className="flex-1">Semua menu</span>
             <span className="text-xs text-muted-foreground">{total}</span>
           </Link>
           {categories.map((c, i) => (
-            <div key={c.id} className={cn("group flex items-center rounded-xl transition", selected === c.id ? "bg-primary/10 text-primary" : "hover:bg-muted")}>
+            <div key={c.id} className={cn("group flex shrink-0 items-center whitespace-nowrap rounded-xl transition lg:shrink", selected === c.id ? "bg-primary/10 text-primary" : "hover:bg-muted")}>
               <Link href={`/dashboard/menu?category=${c.id}`} className={cn("flex flex-1 items-center gap-2.5 px-3 py-2 text-sm font-medium", !c.isActive && "opacity-50")}>
                 <span>{c.icon}</span> <span className="flex-1 truncate">{c.name}</span>
                 <span className="text-xs text-muted-foreground">{c.products.length}</span>
@@ -99,9 +99,9 @@ export function MenuManager({ categories, selected }: { categories: Cat[]; selec
         </nav>
       </aside>
 
-      <section className="space-y-4">
+      <section className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative w-full max-w-xs">
+          <div className="relative min-w-0 flex-1 sm:max-w-xs">
             <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
             <Input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Cari menu" className="pl-9" />
           </div>
@@ -119,23 +119,24 @@ export function MenuManager({ categories, selected }: { categories: Cat[]; selec
         ) : (
           <div className="divide-y overflow-hidden rounded-2xl border bg-card">
             {products.map((p) => (
-              <div key={p.id} className={cn("flex items-center gap-4 p-3 pr-4 transition hover:bg-muted/30", !p.isActive && "opacity-60")}>
-                <ProductImage src={p.imageUrl} name={p.name} emoji={p.emoji ?? p.cat.icon} className="size-16 shrink-0 rounded-xl" emojiClassName="text-2xl" />
+              <div key={p.id} className={cn("flex items-center gap-3 p-3 transition sm:gap-4 sm:pr-4 hover:bg-muted/30", !p.isActive && "opacity-60")}>
+                <ProductImage src={p.imageUrl} name={p.name} emoji={p.emoji ?? p.cat.icon} className="size-14 shrink-0 rounded-xl sm:size-16" emojiClassName="text-2xl" />
                 <Link href={`/dashboard/menu/${p.id}`} className="min-w-0 flex-1">
                   <p className="flex items-center gap-2 font-semibold">
                     <span className="truncate">{p.name}</span>
                     {p.isFeatured && <Star className="size-3.5 shrink-0 fill-amber-400 text-amber-400" />}
                   </p>
                   <p className="truncate text-xs text-muted-foreground">{p.description || "—"}</p>
+                  <p className="mt-0.5 text-sm font-semibold tabular sm:hidden">{formatRupiah(p.price)}</p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     {selected === "all" && <Badge variant="secondary">{p.cat.icon} {p.cat.name}</Badge>}
                     {p.groups > 0 && <Badge variant="info">{p.groups} grup pilihan</Badge>}
                   </div>
                 </Link>
-                <p className="hidden w-28 text-right font-semibold tabular sm:block">{formatRupiah(p.price)}</p>
-                <Switch checked={p.isActive} onCheckedChange={(v) => act(() => toggleProductActive(p.id, v), v ? "Menu diaktifkan" : "Menu disembunyikan")} title="Tampilkan di menu" />
+                <p className="hidden w-28 shrink-0 text-right font-semibold tabular sm:block">{formatRupiah(p.price)}</p>
+                <Switch className="shrink-0" checked={p.isActive} onCheckedChange={(v) => act(() => toggleProductActive(p.id, v), v ? "Menu diaktifkan" : "Menu disembunyikan")} title="Tampilkan di menu" />
                 <DropdownMenu>
-                  <DropdownMenuTrigger className="rounded-lg p-1.5 hover:bg-muted">
+                  <DropdownMenuTrigger className="shrink-0 rounded-lg p-1.5 hover:bg-muted">
                     <MoreVertical className="size-4" />
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">

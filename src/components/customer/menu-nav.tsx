@@ -2,7 +2,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { ChevronRight, Camera, Clock, History, LogOut, MapPin, Receipt, ShoppingBag, Star } from "lucide-react";
+import { ChevronRight, Camera, Clock, History, LogOut, MapPin, Receipt, ShoppingBag, Star, Phone } from "lucide-react";
 import { BRAND, BRAND_PHOTOS } from "@/lib/brand";
 import { isOpenNow } from "@/lib/pickup";
 import { cn, initials } from "@/lib/utils";
@@ -96,7 +96,7 @@ export function InfoSheet({ open, onOpenChange, outlet }: { open: boolean; onOpe
       <DrawerContent>
         <div className="space-y-3 overflow-y-auto px-5 pb-safe pt-3">
           <div className="relative aspect-[16/7] overflow-hidden rounded-2xl bg-muted">
-            <Image src={BRAND_PHOTOS.front} alt={`Tampak depan ${BRAND.name}`} fill sizes="(max-width: 640px) 100vw, 576px" className="object-cover" />
+            <Image src={BRAND_PHOTOS.front} alt={`Suasana ${BRAND.name}`} fill sizes="(max-width: 640px) 100vw, 576px" className="object-cover" unoptimized={BRAND_PHOTOS.front.endsWith(".svg")} />
           </div>
           <div>
             <DrawerTitle className="font-display text-3xl leading-tight tracking-wide">{outlet.name}</DrawerTitle>
@@ -118,8 +118,11 @@ export function InfoSheet({ open, onOpenChange, outlet }: { open: boolean; onOpe
               external
             />
             <Row icon={MapPin} title={BRAND.area} sub={outlet.address || BRAND.address} href={BRAND.links.maps} external />
+            <Row icon={Phone} title={BRAND.phone} sub="WhatsApp & reservasi" href={BRAND.links.whatsapp} external />
             <Row icon={Camera} title={BRAND.links.instagramHandle} sub="Lihat di Instagram" href={BRAND.links.instagram} external />
-            <Row icon={Star} title={`${BRAND.rating.score} dari ${BRAND.rating.count} ulasan`} sub="Ulasan Google" href={BRAND.links.maps} external />
+            {BRAND.rating.count > 0 && (
+              <Row icon={Star} title={`${BRAND.rating.score} dari ${BRAND.rating.count} ulasan`} sub="Ulasan Google" href={BRAND.links.maps} external />
+            )}
           </div>
         </div>
       </DrawerContent>

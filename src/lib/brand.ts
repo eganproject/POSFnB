@@ -1,39 +1,51 @@
 /**
  * Identitas outlet yang tampil di website, menu customer, struk, dan layar staf.
- * Ganti isi file ini (dan foto di /public/warmhour) untuk memakai aplikasi di brand lain.
+ * Ganti isi file ini (dan foto di /public/aprez) untuk memakai aplikasi di brand lain.
+ * Sumber: Chope, NOW! Jakarta, Nibble.id, aprez.id, Instagram @aprezlocale.id (November 2026).
  */
 export const BRAND = {
-  name: "Warm Hour Cafe",
-  shortName: "Warm Hour",
-  tagline: "a neighborhood cafe",
-  description: "Kopi, matcha, roti cocol, dan salt bread di Duri Pulo, Jakarta Pusat. Pesan langsung dari meja lewat QR.",
-  address: "No.11 Blok A1, Jl. KH. Moh. Mansyur, RT.15/RW.4, Duri Pulo, Gambir, Jakarta Pusat 10140",
-  area: "Duri Pulo, Gambir",
-  hours: "Setiap hari, 07.30 – 21.00",
-  hoursShort: "07.30 – 21.00",
-  priceRange: "Rp 50–75 rb per orang",
-  rating: { score: "4,7", count: 64 },
+  name: "Aprez Locale",
+  shortName: "Aprez Locale",
+  tagline: "Asian comfort, all day",
+  description:
+    "Masakan Asia dan Nusantara yang akrab di lidah, dari sarapan sampai makan malam, di lantai dasar Citadines Sudirman Jakarta. Pesan langsung dari meja lewat QR.",
+  address: "Citadines Sudirman Jakarta (The Newton 1, Ciputra World 2), Jl. Karet Sawah No.219, Karet Semanggi, Setiabudi, Jakarta Selatan 12930",
+  area: "Citadines Sudirman, Setiabudi",
+  hours: "Setiap hari, 06.00 – 22.00",
+  hoursShort: "06.00 – 22.00",
+  priceRange: "Rp 100–250 rb per orang",
+  /** Isi angka rating Google bila sudah dicek; count 0 = bagian rating disembunyikan */
+  rating: { score: "", count: 0 },
+  phone: "0852-8570-6736",
   links: {
-    maps: "https://maps.app.goo.gl/hyFFEfSgGyvhn1Fz6",
-    instagram: "https://www.instagram.com/cafe_by_warmhour/",
-    instagramHandle: "@cafe_by_warmhour",
-    grabfood: "https://r.grab.com/g/2-1-6-C8DDGUABSFCUG2",
-    customCake: "https://www.instagram.com/warmhour__",
+    maps: "https://maps.app.goo.gl/yeQhoWiyuPgu9r997",
+    instagram: "https://www.instagram.com/aprezlocale.id/",
+    instagramHandle: "@aprezlocale.id",
+    whatsapp: "https://wa.me/6285285706736",
+    reservation: "https://www.chope.co/jakarta-restaurants/restaurant/aprez-locale-citadines-sudirman-jakarta",
   },
-  /** Warna tema browser/PWA (hijau zaitun dari papan menu) */
-  themeColor: "#66694f",
-  backgroundColor: "#fbf6ea",
+  /** Terakota dan kertas nasi: warna tema browser/PWA */
+  themeColor: "#9c4a2b",
+  backgroundColor: "#f7f0e4",
   poweredBy: "Santap POS",
 } as const;
 
 export const BRAND_PHOTOS = {
-  front: "/warmhour/front.jpg",
-  interior: ["/warmhour/interior-1.jpg", "/warmhour/interior-2.jpg", "/warmhour/interior-3.jpg", "/warmhour/interior-4.jpg"],
-  display: "/warmhour/display.jpg",
+  logo: "/aprez/logo.svg",
+  logoLight: "/aprez/logo-light.svg",
+  /** Foto tampak depan/suasana. Kosong = pakai ilustrasi bawaan. */
+  front: "/aprez/front.svg",
+  interior: ["/aprez/front.svg"],
+  display: "/aprez/front.svg",
 } as const;
 
-export const BRAND_REVIEWS = [
-  { quote: "Salah satu kafe yang sangat worth to visit buat menikmati suasana tenang.", by: "Ulasan Google" },
-  { quote: "Tahu rempahnya mantep banget, ditambah manis-manis matcha & roti cocol.", by: "Ulasan Google" },
-  { quote: "Their roti, cakes and salt bread are god tier level.", by: "Ulasan Google" },
+/** Ruang semi-VIP dari halaman reservasi Chope */
+export const BRAND_ROOMS = [
+  { name: "Ruang sedang", guests: 8, minimum: "Rp 1,5 jt++" },
+  { name: "Ruang besar", guests: 12, minimum: "Rp 2,5 jt++" },
 ] as const;
+
+/** Grup usaha yang sama (Amuz Group), dari NOW! Jakarta */
+export const BRAND_FAMILY = ["Amuz Gourmet", "Artoz Bar", "Aprez Café", "Aprez Catering", "Caffe Tutti"] as const;
+
+export const BRAND_REVIEWS = [] as readonly { quote: string; by: string }[];
