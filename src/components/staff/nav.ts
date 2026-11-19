@@ -1,6 +1,6 @@
 import type { Role } from "@prisma/client";
 import {
-  BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone, Settings, Undo2, History,
+  BarChart3, ChefHat, ClipboardList, LayoutDashboard, PackageX, QrCode, Store, UtensilsCrossed, Users, Wallet, MonitorSmartphone, Settings, Undo2, History, Contact,
 } from "lucide-react";
 
 export const SIDEBAR_COOKIE = "sidebar_collapsed";
@@ -14,6 +14,7 @@ export const NAV = [
   { href: "/dashboard/shifts", label: "Shift kasir", icon: Wallet, roles: ["OWNER", "KASIR"] as Role[] },
   { href: "/dashboard/menu", label: "Menu", icon: UtensilsCrossed, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/tables", label: "Meja & QR", icon: QrCode, roles: ["OWNER", "KASIR", "PELAYAN"] as Role[], group: "Kelola" },
+  { href: "/dashboard/customers", label: "Pelanggan", icon: Contact, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/reports", label: "Laporan", icon: BarChart3, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/refunds", label: "Refund", icon: Undo2, roles: ["OWNER"] as Role[], group: "Kelola" },
   { href: "/dashboard/activity", label: "Log aktivitas", icon: History, roles: ["OWNER"] as Role[], group: "Kelola" },
@@ -31,6 +32,6 @@ export function currentPage(pathname: string) {
   const item = [...NAV].sort((a, b) => b.href.length - a.href.length).find((n) => isNavActive(n.href, pathname));
   if (!item) return { section: "Dashboard", title: "Dashboard", icon: LayoutDashboard, sub: null as string | null };
   const rest = pathname.slice(item.href.length).replace(/^\//, "");
-  const sub = rest ? (rest === "new" ? "Tambah baru" : "Ubah") : null;
+  const sub = rest ? (rest === "new" ? "Tambah baru" : item.href === "/dashboard/customers" ? "Detail" : "Ubah") : null;
   return { section: item.group ?? "Operasional", title: item.label, icon: item.icon, sub, href: item.href };
 }
